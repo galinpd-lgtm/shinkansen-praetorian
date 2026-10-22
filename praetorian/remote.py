@@ -19,7 +19,8 @@ from . import __version__, cards, versions
 
 UA = "BoostWorkers-Praetorian/%s (+https://boostworkers.com; passive check)" % __version__
 MAX_BODY = 1_500_000
-TIMEOUT = 25
+TIMEOUT = 12          # per request; most sites answer in 1–5 s
+FEED_BUDGET = 6       # seconds: if the first answer took longer, the extra feed request is skipped
 PAUSE = 1.0
 
 
@@ -224,11 +225,13 @@ def check(address, src=None, card_list=None):
     """Run the full passive check. Returns a result dict (no HTML)."""
     card_list = card_list if card_list is not None else cards.load_cards()
     started = time.strftime("%Y-%m-%dT%H:%M:%S")
+    t0 = time.time()
     resp = fetch_follow(address)
     found = detect(resp)
 
     # one extra, ordinary request: the WordPress feed shows the version
-    if "wordpress" in found and not found["wordpress"]["version"]:
+    # (skipped when the site is already slow — keeps each check short)
+    if "wordpress" in found and not found["wordpress"]["version"] and time.time() - t0 < FEED_BUDGET:
         time.sleep(PAUSE)
         try:
             feed = fetch(resp["final_scheme"], resp["final_host"], "/feed/")
