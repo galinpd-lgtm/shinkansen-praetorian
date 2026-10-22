@@ -64,6 +64,67 @@ T = {
 }
 
 
+HEADERS = {
+    "bg": {
+        "strict-transport-security": "HSTS — браузърът винаги идва по защитена връзка (https)",
+        "content-security-policy": "CSP — ограничава откъде страницата зарежда скриптове; спира голяма част от подменения код",
+        "x-content-type-options": "забранява на браузъра да „гадае“ вида на файловете",
+        "x-frame-options": "пази сайта да не бъде вграден в чужда страница (подмамване с кликове)",
+        "referrer-policy": "не издава на чужди сайтове откъде идва посетителят",
+    },
+    "en": {
+        "strict-transport-security": "HSTS — the browser always comes over a secure connection (https)",
+        "content-security-policy": "CSP — limits where the page loads scripts from; stops much injected code",
+        "x-content-type-options": "stops the browser from guessing file types",
+        "x-frame-options": "keeps the site from being framed by a foreign page (clickjacking)",
+        "referrer-policy": "does not tell other sites where the visitor came from",
+    },
+}
+
+TODO = {
+    "bg": {"title": "Какво да оправите първо", "none": "Няма спешни задачи по това, което се вижда отвън.",
+           "card": "%s: %s — поискайте от хостинга поправен PHP (писмото е по-долу).",
+           "eol": "%s %s е без поддръжка — вече не получава поправки на сигурността. Обновете.",
+           "old": "%s %s е остаряла версия (последна: %s). Обновете след архив.",
+           "nohttps": "Сайтът не се отваря по защитена връзка (https). Включете сертификат.",
+           "cert": "Сертификатът изтича след %d дни. Проверете автоматичното подновяване.",
+           "hsts": "Добавете HSTS, за да се отваря сайтът винаги по https."},
+    "en": {"title": "Fix this first", "none": "Nothing urgent in what is visible from outside.",
+           "card": "%s: %s — ask your host for a patched PHP (letter below).",
+           "eol": "%s %s is end-of-life — it no longer gets security fixes. Update it.",
+           "old": "%s %s is outdated (latest: %s). Update after a backup.",
+           "nohttps": "The site does not open over a secure connection (https). Enable a certificate.",
+           "cert": "The certificate expires in %d days. Check automatic renewal.",
+           "hsts": "Add HSTS so the site always opens over https."},
+}
+
+
+def priorities(rep, lang="bg", card_list=None):
+    """Plain, ordered to-do list for the owner."""
+    t = TODO[lang]
+    cmap = {c["id"]: c for c in (card_list or C.load_cards())}
+    out = []
+    for r in rep.get("cards", []):
+        if r["status"] in (C.AFFECTED, C.VENDOR, C.LIKELY):
+            out.append(t["card"] % (cmap.get(r["card"], {}).get("name", r["card"]), STATUS[lang][r["status"]]))
+    for s in rep.get("software", []):
+        e = s.get("eol") or {}
+        v, n = versions.parse(s.get("version")), versions.parse(s.get("latest"))
+        if e.get("ended") and not s.get("distro"):
+            out.append(t["eol"] % (s["product"], s.get("version")))
+        elif v and n and versions.cmp(v[:2], n[:2]) < 0:
+            out.append(t["old"] % (s["product"], s.get("version"), s.get("latest")))
+    b = rep.get("basics")
+    if b:
+        if not b.get("https"):
+            out.append(t["nohttps"])
+        elif b.get("cert_days_left") is not None and b["cert_days_left"] < 21:
+            out.append(t["cert"] % b["cert_days_left"])
+        if b.get("https") and "strict-transport-security" in b.get("missing_headers", []):
+            out.append(t["hsts"])
+    return out
+
+
 def _support(s, t):
     e = s.get("eol")
     if s.get("distro"):
@@ -135,7 +196,7 @@ pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);paddi
 footer{color:var(--mute);font-size:13px;margin:30px 0}a{color:var(--orange)}"""
 
 
-def page(rep, lang="bg", card_list=None, diff=None):
+def page(rep, lang="bg", card_list=None, diff=None, back_url=None):
     t = T[lang]
     e = html.escape
     cmap = {c["id"]: c for c in (card_list or C.load_cards())}
@@ -149,6 +210,12 @@ def page(rep, lang="bg", card_list=None, diff=None):
     out.append('<header><div class="w"><div class="m" style="color:#bbb">BoostWorkers</div>'
                '<h1>%s</h1><div>%s · %s: %s</div></div></header><main class="w">'
                % (e(title), e(target), e(t["checked"]), e(rep["checked_at"])))
+    if back_url:
+        out.append('<p><a href="%s">%s</a></p>' % (e(back_url), e("← Нова проверка" if lang == "bg" else "← New check")))
+    todo = priorities(rep, lang, card_list)
+    out.append('<div class="card" style="border-left:5px solid %s"><b>%s</b>%s</div>' % (
+        "#d64545" if todo else "#13a09c", e(TODO[lang]["title"]),
+        "<ol>%s</ol>" % "".join("<li>%s</li>" % e(x) for x in todo) if todo else "<p>%s</p>" % e(TODO[lang]["none"])))
 
     out.append("<h2>%s</h2>" % e(t["cards"]))
     for r in rep["cards"]:
@@ -187,7 +254,11 @@ def page(rep, lang="bg", card_list=None, diff=None):
             e(t["basics"]), e(t["https"]), e(t["yes"] if b["https"] else t["no"])))
         if b.get("cert_days_left") is not None:
             out.append("%s: <b>%s</b><br>" % (e(t["cert"]), b["cert_days_left"]))
-        out.append("%s: %s</div>" % (e(t["missing"]), e(", ".join(b["missing_headers"]) or t["none"])))
+        if b["missing_headers"]:
+            out.append("%s:<ul>%s</ul></div>" % (e(t["missing"]), "".join(
+                "<li><code>%s</code> — %s</li>" % (e(h), e(HEADERS[lang].get(h, ""))) for h in b["missing_headers"])))
+        else:
+            out.append("%s: %s</div>" % (e(t["missing"]), e(t["none"])))
     else:
         out.append("<h2>%s: %d / %d</h2>" % (e(t["libs"]), len(rep["libraries_vulnerable"]), rep["libraries_total"]))
         if rep["libraries_vulnerable"]:

@@ -259,7 +259,7 @@ def app(environ, start_response):
             res = run_check(address)
         except remote.CheckError as e:
             return send("200 OK", _form_page(lang, _err(str(e), lang), address, base=base))
-        return send("200 OK", report.page(res, lang, _cards))
+        return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang))
 
     return send("200 OK", _form_page(lang, base=base))
 

@@ -154,3 +154,14 @@ class Feedback(unittest.TestCase):
         page = b"".join(self.web.app(env, lambda s, h: out.update(s=s))).decode()
         self.assertIn("the method", page)
         self.assertIn("Advice, questions and comments", page)
+
+
+class Priorities(unittest.TestCase):
+    def test_list(self):
+        rep = {"cards": [{"card": "2026-10-php2shell", "status": cards.LIKELY}],
+               "software": [{"product": "wordpress", "version": "5.7.20", "latest": "7.1.3", "eol": {"ended": False}}],
+               "basics": {"https": True, "cert_days_left": 10, "missing_headers": ["strict-transport-security"]}}
+        todo = report.priorities(rep, "bg")
+        self.assertEqual(len(todo), 4)
+        self.assertIn("5.7.20", todo[1])
+        self.assertEqual(report.priorities({"cards": [], "software": [], "basics": {"https": True, "missing_headers": []}}), [])
