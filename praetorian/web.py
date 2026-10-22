@@ -108,7 +108,12 @@ def _err(msg, lang):
 # the only script on the page: show "please wait" while the server works (allowed by its hash in the CSP)
 SCRIPT_BODY = ("document.querySelectorAll('form').forEach(function(f){f.addEventListener('submit',function(){"
                "var b=f.querySelector('button');if(b&&b.dataset.wait){b.textContent=b.dataset.wait;"
-               "b.style.opacity='.7';setTimeout(function(){b.disabled=true},0);}});});")
+               "b.style.opacity='.7';setTimeout(function(){b.disabled=true},0);}});});"
+               "var s=document.getElementById('share');if(s){s.addEventListener('click',function(){"
+               "var d={title:s.dataset.title,text:s.dataset.text,url:s.dataset.url};"
+               "if(navigator.share){navigator.share(d).catch(function(){});}"
+               "else if(navigator.clipboard){navigator.clipboard.writeText(d.url).then(function(){s.textContent=s.dataset.copied;});}"
+               "});}")
 SCRIPT = "<script>%s</script>" % SCRIPT_BODY
 SCRIPT_HASH = "sha256-" + base64.b64encode(hashlib.sha256(SCRIPT_BODY.encode("utf-8")).digest()).decode()
 DESC_HTML = {
@@ -130,6 +135,45 @@ DESC_HTML = {
           '<meta property="og:image" content="https://boostworkers.com/assets/praetorian-karta.png">'
           '<meta name="twitter:card" content="summary_large_image">',
 }
+SHARE = {
+    "bg": {"btn": "📤 Сподели с приятел", "copied": "✓ Връзката е копирана", "title": "Провери сайта си за пробиви",
+           "text": "Безплатна проверка дали сайтът ти е засегнат от новия пробив в PHP (PHP2Shell) — за 1 минута:",
+           "or": "или директно:", "url": "https://boostworkers.com/proveri/",
+           "after_title": "Помогни и на някой друг",
+           "after": "Познаваш ли някого със сайт — фирма, хотел, НПО, лекар, занаятчия? Изпрати му проверката, отнема 1 минута.",
+           "after_text": "Току-що проверих сайта си за новия пробив в PHP (PHP2Shell). Безплатно е и отнема 1 минута — провери и твоя:"},
+    "en": {"btn": "📤 Share with a friend", "copied": "✓ Link copied", "title": "Check your website for breaches",
+           "text": "Free 1-minute check whether your website is affected by the new PHP flaw (PHP2Shell):",
+           "or": "or directly:", "url": "https://boostworkers.com/proveri/?lang=en",
+           "after_title": "Help someone else too",
+           "after": "Know someone with a website — a company, hotel, NGO, doctor, craftsman? Send them the check, it takes 1 minute.",
+           "after_text": "I just checked my website for the new PHP flaw (PHP2Shell). It is free and takes 1 minute — check yours:"},
+}
+
+
+def share_html(lang, button=True):
+    t = dict(SHARE[lang])
+    if not button:                      # after a check: personal invitation, the moment people share most
+        t["text"] = t["after_text"]
+    q = urllib.parse.quote
+    msg = t["text"] + " " + t["url"]
+    links = [
+        ("Viber", "viber://forward?text=" + q(msg)),
+        ("WhatsApp", "https://wa.me/?text=" + q(msg)),
+        ("Facebook", "https://www.facebook.com/sharer/sharer.php?u=" + q(t["url"])),
+        ("LinkedIn", "https://www.linkedin.com/sharing/share-offsite/?url=" + q(t["url"])),
+        ("Telegram", "https://t.me/share/url?url=" + q(t["url"]) + "&text=" + q(t["text"])),
+        ("Email", "mailto:?subject=" + q(t["title"]) + "&body=" + q(msg)),
+    ]
+    e = html.escape
+    btn = ('<button type="button" id="share" data-title="%s" data-text="%s" data-url="%s" data-copied="%s">%s</button>'
+           % (e(t["title"]), e(t["text"]), e(t["url"]), e(t["copied"]), e(t["btn"]))) if button else ""
+    head = "" if button else '<h2>%s</h2><p>%s</p>' % (e(t["after_title"]), e(t["after"]))
+    return (head + '<div class="share">%s<span class="m">%s</span> %s</div>'
+            % (btn, e(t["or"]),
+               " ".join('<a class="sh" href="%s" rel="noopener" target="_blank">%s</a>' % (e(u), n) for n, u in links)))
+
+
 WAIT_CHECK = {"bg": "Проверявам… до 30 сек.", "en": "Checking… up to 30 s"}
 WAIT_SEND = {"bg": "Изпращам…", "en": "Sending…"}
 
@@ -167,16 +211,20 @@ def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base=""):
             '.st b{display:block;font-size:18px;margin-bottom:4px}h3{margin:22px 0 6px}'
             'form.fb{display:grid;gap:10px;max-width:640px}form.fb label{display:grid;gap:4px}'
             'form.fb label.cb{display:flex;gap:8px;align-items:flex-start}form.fb label.cb input{flex:none;min-width:0}'
-            '.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}</style></head><body>'
+            '.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}'
+            '.share{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 18px}'
+            '#share{background:#13a09c;font-weight:700;padding:14px 22px;font-size:18px;width:100%%;max-width:420px}'
+            'a.sh{display:inline-block;padding:8px 12px;border:1px solid var(--line);border-radius:99px;text-decoration:none;color:var(--ink);background:var(--card);font-size:15px}'
+            '</style></head><body>'
             '<header><div class="w"><div class="m" style="color:#bbb">BoostWorkers · Praetorian</div><h1>%s</h1>'
             '<a href="%s/?lang=%s" style="color:#fff">%s</a></div></header><main class="w">'
             '<form class="chk" method="post" action="%s/?lang=%s"><input name="address" placeholder="example.bg" value="%s" '
             'aria-label="%s" required maxlength="300"><button data-wait="%s">%s</button></form>'
-            '<p class="err">%s</p><p class="m">%s</p>%s%s'
+            '<p class="err">%s</p><p class="m">%s</p>%s%s%s'
             '<footer>BoostWorkers Praetorian %s · Apache-2.0 · '
             '<a href="https://boostworkers.com">boostworkers.com</a></footer></main>%s</body></html>'
             % (lang, e(title), DESC_HTML[lang], report.CSS, e(title), e(base), other, other.upper(), e(base), lang, e(value), e(label),
-               e(WAIT_CHECK[lang]), e(button), e(message), e(note), page_text.METHOD[lang],
+               e(WAIT_CHECK[lang]), e(button), e(message), e(note), share_html(lang), page_text.METHOD[lang],
                _feedback_html(lang, fb_message, fb_ok, base), __version__, SCRIPT))
 
 
@@ -279,7 +327,8 @@ def app(environ, start_response):
             res = run_check(address)
         except remote.CheckError as e:
             return send("200 OK", _form_page(lang, _err(str(e), lang), address, base=base))
-        return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang))
+        return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang,
+                                              extra_html=share_html(lang, button=False)))
 
     return send("200 OK", _form_page(lang, base=base), index=(method == "GET"))
 

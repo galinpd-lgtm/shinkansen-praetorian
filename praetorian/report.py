@@ -193,10 +193,12 @@ h1{margin:6px 0;font-size:clamp(22px,4.5vw,32px)}h2{font-size:20px;margin:28px 0
 table{width:100%;border-collapse:collapse;background:var(--card);font-size:14px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 th{background:var(--dark);color:#fff}.tw{overflow-x:auto}.m{color:var(--mute);font-size:14px}
 pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);padding:10px;border-radius:8px;font-size:14px}
-footer{color:var(--mute);font-size:13px;margin:30px 0}a{color:var(--orange)}"""
+footer{color:var(--mute);font-size:13px;margin:30px 0}a{color:var(--orange)}
+.share{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 18px}
+a.sh{display:inline-block;padding:10px 14px;border:1px solid var(--line);border-radius:99px;text-decoration:none;color:var(--ink);background:var(--card);font-size:16px}"""
 
 
-def page(rep, lang="bg", card_list=None, diff=None, back_url=None):
+def page(rep, lang="bg", card_list=None, diff=None, back_url=None, extra_html=""):
     t = T[lang]
     e = html.escape
     cmap = {c["id"]: c for c in (card_list or C.load_cards())}
@@ -276,5 +278,6 @@ def page(rep, lang="bg", card_list=None, diff=None, back_url=None):
         out.append("</table></div>")
 
     out.append('<p class="m">%s</p><p><b>%s</b></p>' % (e(t["online_note"] if online else t["local_note"]), e(t["help"])))
+    out.append(extra_html)
     out.append('<footer>BoostWorkers Praetorian %s · Apache-2.0</footer></main></body></html>' % e(rep["tool_version"]))
     return "".join(out)
