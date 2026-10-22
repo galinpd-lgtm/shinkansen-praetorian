@@ -80,7 +80,10 @@ def _allowed(ip):
 # use up the account's process limit and take down every site on it, so extra visitors
 # get "busy, try in a minute" instead.
 MAX_PARALLEL = int(os.environ.get("PRAETORIAN_MAX_PARALLEL", "3"))
-SLOT_DIR = os.environ.get("PRAETORIAN_SLOTS", os.path.join(tempfile.gettempdir(), "praetorian_slots"))
+# a fixed folder shared by all processes (Passenger may give each process its own temp dir)
+SLOT_DIR = os.environ.get("PRAETORIAN_SLOTS",
+                          os.path.join(os.path.expanduser("~"), "praetorian_danni", "slots") if fcntl
+                          else os.path.join(tempfile.gettempdir(), "praetorian_slots"))
 
 
 class Busy(Exception):
