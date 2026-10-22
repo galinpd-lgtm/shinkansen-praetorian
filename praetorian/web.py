@@ -17,9 +17,15 @@ import hashlib
 import html
 import json
 import os
+import tempfile
 import threading
 import time
 import urllib.parse
+
+try:
+    import fcntl
+except ImportError:          # Windows (local tests) — in-process semaphore instead
+    fcntl = None
 
 from . import __version__, cards, page_text, remote, report
 from .sources import Sources
@@ -69,6 +75,51 @@ def _allowed(ip):
         return True
 
 
+# --- at most N checks at the same time, across all server processes ----------
+# Each check holds a worker for up to ~25 s. On shared hosting a rush of visitors could
+# use up the account's process limit and take down every site on it, so extra visitors
+# get "busy, try in a minute" instead.
+MAX_PARALLEL = int(os.environ.get("PRAETORIAN_MAX_PARALLEL", "3"))
+SLOT_DIR = os.environ.get("PRAETORIAN_SLOTS", os.path.join(tempfile.gettempdir(), "praetorian_slots"))
+
+
+class Busy(Exception):
+    pass
+
+
+class _Slot:
+    """Non-blocking slot: a file lock per slot (Linux, works across processes), a semaphore elsewhere."""
+    _sem = threading.BoundedSemaphore(MAX_PARALLEL)
+
+    def __enter__(self):
+        self.f = None
+        if fcntl:
+            os.makedirs(SLOT_DIR, exist_ok=True)
+            for i in range(MAX_PARALLEL):
+                f = open(os.path.join(SLOT_DIR, "slot%d" % i), "a")
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    self.f = f
+                    return self
+                except OSError:
+                    f.close()
+            raise Busy()
+        if not self._sem.acquire(blocking=False):
+            raise Busy()
+        return self
+
+    def __exit__(self, *exc):
+        if self.f:
+            fcntl.flock(self.f, fcntl.LOCK_UN)
+            self.f.close()
+        else:
+            self._sem.release()
+
+
+BUSY = {"bg": "В момента много хора проверяват сайтовете си. Опитайте пак след минута — проверката е безплатна и ще ви чака.",
+        "en": "Many people are checking their websites right now. Please try again in a minute — the check is free and will wait for you."}
+
+
 def run_check(address):
     _, host, _ = remote.normalize(address)
     now = time.time()
@@ -76,7 +127,8 @@ def run_check(address):
         saved = _saved.get(host)
         if saved and now - saved[0] < SAME_SITE_SECONDS:
             return saved[1]
-    res = remote.check(address, Sources(), _cards)
+    with _Slot():
+        res = remote.check(address, Sources(), _cards)
     with _lock:
         _saved[host] = (now, res)
         if len(_saved) > 5000:
@@ -302,6 +354,8 @@ def app(environ, start_response):
             res = run_check(address)
         except remote.CheckError as e:
             return send("400 Bad Request", json.dumps({"error": str(e)}), "application/json")
+        except Busy:
+            return send("503 Service Unavailable", json.dumps({"error": "busy, try again in a minute"}), "application/json")
         return send("200 OK", json.dumps(res, ensure_ascii=False), "application/json; charset=utf-8")
 
     if method == "POST":
@@ -327,6 +381,8 @@ def app(environ, start_response):
             res = run_check(address)
         except remote.CheckError as e:
             return send("200 OK", _form_page(lang, _err(str(e), lang), address, base=base))
+        except Busy:
+            return send("200 OK", _form_page(lang, BUSY[lang], address, base=base))
         return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang,
                                               extra_html=share_html(lang, button=False)))
 

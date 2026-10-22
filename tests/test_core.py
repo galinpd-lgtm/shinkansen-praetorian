@@ -165,3 +165,17 @@ class Priorities(unittest.TestCase):
         self.assertEqual(len(todo), 4)
         self.assertIn("5.7.20", todo[1])
         self.assertEqual(report.priorities({"cards": [], "software": [], "basics": {"https": True, "missing_headers": []}}), [])
+
+
+class Parallel(unittest.TestCase):
+    def test_cap(self):
+        import tempfile
+        from praetorian import web
+        web.SLOT_DIR = tempfile.mkdtemp()
+        held = [web._Slot().__enter__() for _ in range(web.MAX_PARALLEL)]
+        with self.assertRaises(web.Busy):
+            web._Slot().__enter__()
+        for s in held:
+            s.__exit__(None, None, None)
+        s = web._Slot().__enter__()
+        s.__exit__(None, None, None)
