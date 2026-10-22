@@ -111,6 +111,12 @@ SCRIPT_BODY = ("document.querySelectorAll('form').forEach(function(f){f.addEvent
                "b.style.opacity='.7';setTimeout(function(){b.disabled=true},0);}});});")
 SCRIPT = "<script>%s</script>" % SCRIPT_BODY
 SCRIPT_HASH = "sha256-" + base64.b64encode(hashlib.sha256(SCRIPT_BODY.encode("utf-8")).digest()).decode()
+DESC_HTML = {
+    "bg": '<meta name="description" content="Безплатна пасивна проверка дали сайтът ви е засегнат от нови пробиви (PHP2Shell и др.) и какво да оправите първо. BoostWorkers Praetorian.">'
+          '<link rel="canonical" href="https://boostworkers.com/proveri/">',
+    "en": '<meta name="description" content="Free passive check whether your website is affected by new vulnerabilities (PHP2Shell and more) and what to fix first. BoostWorkers Praetorian.">'
+          '<link rel="canonical" href="https://boostworkers.com/proveri/?lang=en">',
+}
 WAIT_CHECK = {"bg": "Проверявам… до 30 сек.", "en": "Checking… up to 30 s"}
 WAIT_SEND = {"bg": "Изпращам…", "en": "Sending…"}
 
@@ -139,6 +145,7 @@ def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base=""):
     e = html.escape
     return ('<!doctype html><html lang="%s"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title>'
+            + DESC_HTML[lang] +
             '<style>%s form.chk{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}'
             'input,textarea{flex:1;min-width:220px;padding:12px;font:inherit;font-size:17px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}'
             'button{padding:12px 22px;font-size:17px;background:var(--orange);color:#fff;border:0;border-radius:8px;cursor:pointer}'
@@ -210,7 +217,7 @@ def app(environ, start_response):
     qs = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
     lang = "en" if qs.get("lang", ["bg"])[0] == "en" else "bg"
     headers = [("X-Content-Type-Options", "nosniff"), ("Referrer-Policy", "no-referrer"),
-               ("X-Frame-Options", "DENY"), ("X-Robots-Tag", "noindex"),
+               ("X-Frame-Options", "DENY"),
                ("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "
                 "script-src '%s'; form-action 'self'" % SCRIPT_HASH)]
 
@@ -221,9 +228,10 @@ def app(environ, start_response):
                                                  ("Content-Length", "0")])
         return [b""]
 
-    def send(status, body, ctype="text/html; charset=utf-8"):
+    def send(status, body, ctype="text/html; charset=utf-8", index=False):
         data = body.encode("utf-8")
-        start_response(status, [("Content-Type", ctype), ("Content-Length", str(len(data)))] + headers)
+        robots = [] if index else [("X-Robots-Tag", "noindex")]   # only the public form page is indexed
+        start_response(status, [("Content-Type", ctype), ("Content-Length", str(len(data)))] + headers + robots)
         return [data]
 
     if path.rstrip("/").endswith("/api/check"):
@@ -261,7 +269,7 @@ def app(environ, start_response):
             return send("200 OK", _form_page(lang, _err(str(e), lang), address, base=base))
         return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang))
 
-    return send("200 OK", _form_page(lang, base=base))
+    return send("200 OK", _form_page(lang, base=base), index=(method == "GET"))
 
 
 if __name__ == "__main__":
