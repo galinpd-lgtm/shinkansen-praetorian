@@ -1,0 +1,70 @@
+{
+  "id": "2026-10-php2shell",
+  "name": "PHP2Shell",
+  "cve": ["CVE-2026-109618", "CVE-2026-109619"],
+  "published": "2026-10-21",
+  "updated": "2026-10-22",
+  "cvss": "9.2 (CVSS v4.0)",
+  "exploited": "AWS: first attempt 17.10.2026, more attempts 21.10.2026. Active attempts confirmed; a count of successfully breached sites is not confirmed.",
+  "product": "php",
+  "min_affected": "5.4",
+  "fixed": {
+    "8.5": "8.5.12",
+    "8.4": "8.4.27",
+    "8.3": "8.3.36",
+    "8.2": "8.2.35"
+  },
+  "vendor_only_below": "8.2",
+  "vendor_fixed_deb": {
+    "ubuntu:24.04": {"php8.3": "8.3.6-0ubuntu0.24.04.13"},
+    "ubuntu:22.04": {"php8.1": "8.1.2-1ubuntu2.28"},
+    "debian:13": {"php8.4": "8.4.27-1~deb13u1"}
+  },
+  "vendor_rpm_changelog": ["ea-php", "alt-php"],
+  "vendor_notes": [
+    "cPanel EasyApache 4: EA4 25.91 (21.10.2026) fixes ea-php74 to ea-php85.",
+    "CloudLinux: fixed ea-php52 to ea-php85 (CL 7-10); fixed alt-php in stable repos from 22.10.2026 01:25 UTC.",
+    "Plesk: fixed PHP 8.2-8.5; rebuilt 7.4.33, 8.0.30, 8.1.34 dated 21.10.2026 (same version number).",
+    "RHEL 9 php:8.3 module: RHSA-2026:87079.",
+    "Official Docker php images: rebuilt with 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12 - pull the new image and recreate the container.",
+    "Cloudflare WAF (all plans) from 21.10.2026 03:02 UTC; Imunify360 rules 8.83-8.85 (no blocking rule for the CVE-2026-109618 memory path)."
+  ],
+  "sources": [
+    "https://www.php.net/archive/2026.php#2026-10-21-1",
+    "https://aws.amazon.com/blogs/security/amazon-threat-intelligence-identifies-php2shell-exploitation-prior-to-public-disclosure-in-madpot/",
+    "https://www.enisa.europa.eu/news/joint-statement-on-critical-php-vulnerabilities",
+    "https://ubuntu.com/security/notices/USN-8948-1",
+    "https://security-tracker.debian.org/tracker/CVE-2026-109618",
+    "https://docs.cpanel.net/release-notes/release-notes/",
+    "https://blog.cloudlinux.com/php-cve-2026-109618-and-cve-2026-109619",
+    "https://blog.cloudflare.com/php-vulnerabilities-waf-protection"
+  ],
+  "text": {
+    "bg": {
+      "what": "Две критични слабости в самия PHP. Позволяват на непознат да изпълни код на сървъра без вход. Има потвърдени опити за атака от 17.10.2026.",
+      "who": "Всеки PHP, който обслужва уеб страници (от 5.4 нагоре): почти всички WordPress, Joomla, Moodle и Nextcloud сайтове, уеб пощи и хостинг панели.",
+      "fix": "Единствената пълна мярка е поправен PHP: 8.5.12, 8.4.27, 8.3.36 или 8.2.35, или поправен пакет от хостинга или дистрибуцията (номерът при тях може да остане стар). След обновяването PHP процесите трябва да се рестартират, а Docker контейнерите — да се пуснат наново от новия образ.",
+      "temp": [
+        "Докато чакате поправката: session.upload_progress.enabled = 0 в php.ini или FPM (не в .user.ini, не с ini_set) и рестарт на PHP. Затваря само показания път на едната слабост.",
+        "WAF (Cloudflare, Imunify360) помага срещу известните атаки, но не поправя PHP и може да спре и нормални заявки.",
+        "Не забранявайте качването на файлове на сляпо: формите за контакт (напр. Contact Form 7) също го ползват. Първо проверете кои форми какво пращат.",
+        "Не слагайте memory_limit = -1 и не ограничавайте паметта с RLIMIT: това отваря други рискове.",
+        "„Обнових WordPress“ или „имам Cloudflare“ не значи, че PHP е поправен."
+      ],
+      "hosting_letter": "Здравейте, моля потвърдете дали PHP на акаунта ми е поправен срещу CVE-2026-109618 и CVE-2026-109619 (PHP2Shell, 21.10.2026): кой точно пакет е инсталиран (напр. EA4 25.91 / alt-php от 22.10) и дали работещите PHP процеси са рестартирани след обновяването. Ако още не е — кога ще бъде и може ли междувременно да изключите session.upload_progress на ниво сървър. Благодаря!"
+    },
+    "en": {
+      "what": "Two critical flaws in PHP itself. They let a stranger run code on the server without logging in. Attack attempts have been confirmed since 17 Oct 2026.",
+      "who": "Any PHP that serves web pages (5.4 and newer): almost every WordPress, Joomla, Moodle and Nextcloud site, webmail and hosting panel.",
+      "fix": "The only full fix is a patched PHP: 8.5.12, 8.4.27, 8.3.36 or 8.2.35, or a patched package from your host or distribution (their version number may stay the same). After updating, PHP processes must be restarted and Docker containers recreated from the new image.",
+      "temp": [
+        "While you wait: session.upload_progress.enabled = 0 in php.ini or FPM (not in .user.ini, not with ini_set), then restart PHP. It closes only the demonstrated path of one flaw.",
+        "A WAF (Cloudflare, Imunify360) helps against known attacks, but does not fix PHP and may block normal requests.",
+        "Do not block file uploads blindly: contact forms (e.g. Contact Form 7) use them too. First check what each form sends.",
+        "Do not set memory_limit = -1 and do not limit memory with RLIMIT: that opens other risks.",
+        "\"I updated WordPress\" or \"I have Cloudflare\" does not mean PHP is patched."
+      ],
+      "hosting_letter": "Hello, please confirm whether PHP on my account is patched against CVE-2026-109618 and CVE-2026-109619 (PHP2Shell, 21 Oct 2026): which exact package is installed (e.g. EA4 25.91 / alt-php from 22 Oct) and whether the running PHP processes were restarted after the update. If not yet, when will it be, and can you disable session.upload_progress server-wide meanwhile? Thank you!"
+    }
+  }
+}

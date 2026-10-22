@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "praetorian-breachcheck"
+version = "0.1.0"
+description = "Free, passive breach checks for websites and full version inventory for servers (BoostWorkers)"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.9"
+authors = [{name = "BoostWorkers / KAGAMI Ltd", email = "office@kagami.bg"}]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+
+[project.scripts]
+praetorian = "praetorian.cli:main"
+
+[tool.setuptools]
+packages = ["praetorian"]
+
+[tool.setuptools.package-data]
+praetorian = ["cards/*.json"]
