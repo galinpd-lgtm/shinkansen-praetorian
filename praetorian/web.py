@@ -145,8 +145,7 @@ def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base=""):
     e = html.escape
     return ('<!doctype html><html lang="%s"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title>'
-            + DESC_HTML[lang] +
-            '<style>%s form.chk{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}'
+            '%s<style>%s form.chk{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}'
             'input,textarea{flex:1;min-width:220px;padding:12px;font:inherit;font-size:17px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}'
             'button{padding:12px 22px;font-size:17px;background:var(--orange);color:#fff;border:0;border-radius:8px;cursor:pointer}'
             '.err{color:#d64545;font-weight:700}.ok{color:#13a09c;font-weight:700}'
@@ -163,7 +162,7 @@ def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base=""):
             '<p class="err">%s</p><p class="m">%s</p>%s%s'
             '<footer>BoostWorkers Praetorian %s · Apache-2.0 · '
             '<a href="https://boostworkers.com">boostworkers.com</a></footer></main>%s</body></html>'
-            % (lang, e(title), report.CSS, e(title), e(base), other, other.upper(), e(base), lang, e(value), e(label),
+            % (lang, e(title), DESC_HTML[lang], report.CSS, e(title), e(base), other, other.upper(), e(base), lang, e(value), e(label),
                e(WAIT_CHECK[lang]), e(button), e(message), e(note), page_text.METHOD[lang],
                _feedback_html(lang, fb_message, fb_ok, base), __version__, SCRIPT))
 
