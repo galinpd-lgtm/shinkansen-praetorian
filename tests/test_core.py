@@ -109,3 +109,48 @@ class Packages(unittest.TestCase):
         finally:
             inventory.deb_version_ge, inventory.rpm_changelog_has = old_ge, old_rpm
         self.assertEqual([r["status"] for r in res], [cards.AFFECTED, cards.PATCHED])
+
+
+class Feedback(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from praetorian import web
+        self.web = web
+        self.dir = tempfile.mkdtemp()
+        web.DATA_DIR = self.dir
+        web._fb_hits.clear()
+
+    def post(self, body, ip="9.9.9.9"):
+        import io
+        out = {}
+        env = {"REQUEST_METHOD": "POST", "PATH_INFO": "/otziv", "QUERY_STRING": "lang=bg",
+               "wsgi.input": io.BytesIO(body.encode()), "CONTENT_LENGTH": str(len(body.encode())),
+               "CONTENT_TYPE": "application/x-www-form-urlencoded", "REMOTE_ADDR": ip}
+        page = b"".join(self.web.app(env, lambda s, h: out.update(s=s))).decode()
+        return out["s"], page
+
+    def lines(self):
+        import os
+        p = os.path.join(self.dir, "otzivi.jsonl")
+        return open(p, encoding="utf-8").read().splitlines() if os.path.exists(p) else []
+
+    def test_flow(self):
+        s, p = self.post("message=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D0%B5%D0%B9")
+        self.assertIn("Благодарим", p)
+        self.assertEqual(len(self.lines()), 1)
+        s, p = self.post("message=x&website=spam", ip="1.1.1.2")   # honeypot
+        self.assertEqual(len(self.lines()), 1)
+        s, p = self.post("message=x&email=a%40b.bg", ip="1.1.1.3")  # no consent
+        self.assertIn("съгласието", p)
+        self.assertEqual(len(self.lines()), 1)
+        for _ in range(3):
+            s, p = self.post("message=y", ip="1.1.1.4")
+        self.assertEqual(self.post("message=y", ip="1.1.1.4")[0], "429 Too Many Requests")
+
+    def test_page_has_method(self):
+        import io
+        out = {}
+        env = {"REQUEST_METHOD": "GET", "PATH_INFO": "/", "QUERY_STRING": "lang=en", "REMOTE_ADDR": "1"}
+        page = b"".join(self.web.app(env, lambda s, h: out.update(s=s))).decode()
+        self.assertIn("the method", page)
+        self.assertIn("Advice, questions and comments", page)
