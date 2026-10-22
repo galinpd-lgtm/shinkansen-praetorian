@@ -27,7 +27,7 @@ try:
 except ImportError:          # Windows (local tests) — in-process semaphore instead
     fcntl = None
 
-from . import __version__, cards, page_text, remote, report
+from . import __version__, cards, page_text, poshta, remote, report
 from .sources import Sources
 
 PER_IP_HOUR = 10
@@ -119,8 +119,8 @@ class _Slot:
             self._sem.release()
 
 
-BUSY = {"bg": "В момента много хора проверяват сайтовете си. Опитайте пак след минута — проверката е безплатна и ще ви чака.",
-        "en": "Many people are checking their websites right now. Please try again in a minute — the check is free and will wait for you."}
+BUSY = {"bg": "В момента много хора проверяват сайтовете си. Опитайте пак след минута — или поръчайте отчета на имейл по-долу.",
+        "en": "Many people are checking their websites right now. Try again in a minute — or get the report by email below."}
 
 
 def run_check(address):
@@ -251,7 +251,7 @@ def _feedback_html(lang, fb_message="", fb_ok=False, base=""):
     return '<section id="otziv"><h2>%s</h2><p>%s</p>%s</section>' % (e(t["title"]), e(t["intro"]), body)
 
 
-def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base=""):
+def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base="", mail_message=""):
     title, label, button, note, _ = FORM[lang]
     other = "en" if lang == "bg" else "bg"
     e = html.escape
@@ -275,12 +275,68 @@ def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base=""):
             '<a href="%s/?lang=%s" style="color:#fff">%s</a></div></header><main class="w">'
             '<form class="chk" method="post" action="%s/?lang=%s"><input name="address" placeholder="example.bg" value="%s" '
             'aria-label="%s" required maxlength="300"><button data-wait="%s">%s</button></form>'
-            '<p class="err">%s</p><p class="m">%s</p>%s%s%s'
+            '<p class="err">%s</p><p class="m">%s</p>%s%s%s%s'
             '<footer>BoostWorkers Praetorian %s · Apache-2.0 · '
             '<a href="https://boostworkers.com">boostworkers.com</a></footer></main>%s</body></html>'
             % (lang, e(title), DESC_HTML[lang], report.CSS, e(title), e(base), other, other.upper(), e(base), lang, e(value), e(label),
-               e(WAIT_CHECK[lang]), e(button), e(message), e(note), share_html(lang), page_text.METHOD[lang],
+               e(WAIT_CHECK[lang]), e(button), e(message), e(note), _poshta_html(lang, base, value, mail_message),
+               share_html(lang), page_text.METHOD[lang],
                _feedback_html(lang, fb_message, fb_ok, base), __version__, SCRIPT))
+
+
+POSHTA = {
+    "bg": {"title": "Или: получете отчета на имейл", "intro": "Не искате да чакате? Ще ви изпратим отчета до няколко минути.",
+           "address": "Адрес на сайта", "email": "Вашият имейл", "send": "Изпратете ми отчета",
+           "consent": "Съгласен/съгласна съм имейлът ми да се ползва за изпращане на този отчет.",
+           "novini": "Пишете ми и при нов голям пробив (по желание; може да се откажете с един отговор).",
+           "privacy": "Първо ще получите писмо с връзка за потвърждение — без нея нищо не се изпраща. Пазим имейла само за отчета "
+                      "(и за новините, ако сте отметнали). Не го даваме на никого. Изтриване: office@kagami.bg.",
+           "sent": "Изпратихме писмо за потвърждение на %s. Отворете връзката в него — отчетът идва след това.",
+           "bad_email": "Моля, напишете валиден имейл.", "need_consent": "Отметнете съгласието, за да ви изпратим отчета.",
+           "email_limit": "За този имейл днес вече има няколко заявки. Опитайте утре.",
+           "mail_error": "Не успяхме да изпратим писмото. Пишете ни на office@kagami.bg.",
+           "too_many": "Твърде много заявки от вас за последния час. Опитайте по-късно.",
+           "ok_title": "Потвърдено!", "ok": "Отчетът за %s ще пристигне на имейла ви до няколко минути. Проверете и папка „Спам“.",
+           "bad_link": "Връзката е невалидна или е изтекла (важи 24 часа). Поръчайте отчета отново."},
+    "en": {"title": "Or: get the report by email", "intro": "Don't want to wait? We will email you the report within a few minutes.",
+           "address": "Website address", "email": "Your email", "send": "Email me the report",
+           "consent": "I agree that my email is used to send this report.",
+           "novini": "Also write to me when a new big breach comes out (optional; one reply unsubscribes).",
+           "privacy": "First you get an email with a confirmation link — nothing is sent without it. We keep the email only for the report "
+                      "(and the news, if ticked). We share it with nobody. To delete: office@kagami.bg.",
+           "sent": "We sent a confirmation email to %s. Open the link in it — the report follows.",
+           "bad_email": "Please enter a valid email.", "need_consent": "Please tick the consent box so we can send the report.",
+           "email_limit": "This email already made several requests today. Please try tomorrow.",
+           "mail_error": "We could not send the email. Write to office@kagami.bg.",
+           "too_many": "Too many requests from you in the last hour. Please try later.",
+           "ok_title": "Confirmed!", "ok": "The report for %s will reach your inbox within a few minutes. Check the spam folder too.",
+           "bad_link": "The link is invalid or expired (valid for 24 hours). Please request the report again."},
+}
+
+
+def _poshta_html(lang, base, value="", message=""):
+    t = POSHTA[lang]
+    e = html.escape
+    return ('<section id="poshta"><h2>%s</h2><p>%s</p>'
+            '<form class="fb" method="post" action="%s/poshta?lang=%s#poshta">'
+            '<label>%s<input name="address" placeholder="example.bg" value="%s" required maxlength="300"></label>'
+            '<label>%s<input name="email" type="email" required maxlength="200" autocomplete="email"></label>'
+            '<label class="cb"><input type="checkbox" name="consent" value="1" required> %s</label>'
+            '<label class="cb"><input type="checkbox" name="novini" value="1"> %s</label>'
+            '<div class="hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>'
+            '<button data-wait="%s">%s</button></form><p class="err">%s</p><p class="m">%s</p></section>'
+            % (e(t["title"]), e(t["intro"]), e(base), lang, e(t["address"]), e(value), e(t["email"]), e(t["consent"]),
+               e(t["novini"]), e(WAIT_SEND[lang]), e(t["send"]), e(message), e(t["privacy"])))
+
+
+def _message_page(lang, base, title, text):
+    e = html.escape
+    return ('<!doctype html><html lang="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta name="robots" content="noindex"><title>%s</title><style>%s</style></head><body>'
+            '<header><div class="w"><div class="m" style="color:#bbb">BoostWorkers · Praetorian</div><h1>%s</h1></div></header>'
+            '<main class="w"><p style="font-size:18px">%s</p><p><a href="%s/?lang=%s">%s</a></p>%s</main></body></html>'
+            % (lang, e(title), report.CSS, e(title), e(text), e(base), lang,
+               e("← Към проверката" if lang == "bg" else "← Back to the check"), share_html(lang, button=False)))
 
 
 # --- feedback ------------------------------------------------------------------
@@ -349,6 +405,34 @@ def app(environ, start_response):
         start_response(status, [("Content-Type", ctype), ("Content-Length", str(len(data)))] + headers + robots)
         return [data]
 
+    # --- worker API (GX10): take the queue, give back results -----------------------
+    if path.rstrip("/").endswith("/api/rabotnik/opashka") or path.rstrip("/").endswith("/api/rabotnik/rezultat"):
+        if not poshta.proveri_kluch(DATA_DIR, environ.get("HTTP_X_PRAETORIAN_KEY")):
+            return send("403 Forbidden", json.dumps({"error": "key"}), "application/json")
+        if path.rstrip("/").endswith("/opashka"):
+            return send("200 OK", json.dumps(poshta.za_rabotnika(DATA_DIR), ensure_ascii=False), "application/json; charset=utf-8")
+        try:
+            size = min(int(environ.get("CONTENT_LENGTH") or 0), 2_000_000)
+            d = json.loads(environ["wsgi.input"].read(size).decode("utf-8"))
+            z = poshta.cheti(DATA_DIR, d["id"])
+            res = d.get("rezultat")
+            if res:
+                ok = poshta.rezultat(DATA_DIR, z["id"], res, report.page(res, z["lang"], _cards,
+                                     extra_html=share_html(z["lang"], button=False)), report.text(res, z["lang"], _cards))
+            else:
+                ok = poshta.rezultat(DATA_DIR, z["id"], None, None, None,
+                                     greshka=_err(str(d.get("greshka") or "check failed"), z["lang"]))
+        except Exception as ex:
+            return send("400 Bad Request", json.dumps({"error": str(ex)[:200]}), "application/json")
+        return send("200 OK", json.dumps({"ok": ok}), "application/json")
+
+    if path.rstrip("/").endswith("/potvardi"):
+        z = poshta.potvardi(DATA_DIR, qs.get("id", [""])[0], qs.get("t", [""])[0])
+        t = POSHTA[lang]
+        if not z:
+            return send("200 OK", _message_page(lang, base, "Praetorian", t["bad_link"]))
+        return send("200 OK", _message_page(lang, base, t["ok_title"], t["ok"] % z["address"]))
+
     if path.rstrip("/").endswith("/api/check"):
         address = qs.get("address", [""])[0]
         if not _allowed(_client_ip(environ)):
@@ -370,6 +454,27 @@ def app(environ, start_response):
         if not ctype.startswith("application/x-www-form-urlencoded"):
             return send("415 Unsupported Media Type", _form_page(lang, base=base))
         form = urllib.parse.parse_qs(environ["wsgi.input"].read(size).decode("utf-8", "replace"))
+
+        if path.rstrip("/").endswith("/poshta"):
+            t = POSHTA[lang]
+            first = lambda k: form.get(k, [""])[0].strip()
+            address, email = first("address"), first("email")
+            if first("website"):                         # honeypot: a bot
+                return send("200 OK", _message_page(lang, base, "Praetorian", t["sent"] % ""))
+            if not _fb_allowed("m:" + _client_ip(environ)):
+                return send("429 Too Many Requests", _form_page(lang, base=base, value=address, mail_message=t["too_many"]))
+            try:
+                remote.normalize(address)
+            except remote.CheckError as ex:
+                return send("200 OK", _form_page(lang, base=base, value=address, mail_message=_err(str(ex), lang)))
+            if not poshta.validen_email(email):
+                return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t["bad_email"]))
+            if first("consent") != "1":
+                return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t["need_consent"]))
+            ok, kl = poshta.nova(DATA_DIR, address, email, lang, novini=first("novini") == "1")
+            if not ok:
+                return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t[kl]))
+            return send("200 OK", _message_page(lang, base, "Praetorian", t["sent"] % email))
 
         if path.rstrip("/").endswith("/otziv"):
             if not _fb_allowed(_client_ip(environ)):

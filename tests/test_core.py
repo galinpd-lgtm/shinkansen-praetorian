@@ -179,3 +179,37 @@ class Parallel(unittest.TestCase):
             s.__exit__(None, None, None)
         s = web._Slot().__enter__()
         s.__exit__(None, None, None)
+
+
+class Poshta(unittest.TestCase):
+    def test_flow(self):
+        import tempfile, json, io
+        from praetorian import poshta, web
+        d = tempfile.mkdtemp()
+        sent = []
+        poshta.izprati = lambda do, tema, text, html_=None: sent.append((do, tema, bool(html_)))
+        ok, _ = poshta.nova(d, "example.com", "a@b.bg", "bg")
+        self.assertTrue(ok)
+        self.assertEqual(sent[-1][0], "a@b.bg")
+        zid = [f[:-5] for f in __import__("os").listdir(poshta.papka(d)) if f.endswith(".json")][0]
+        z = poshta.cheti(d, zid)
+        self.assertIsNone(poshta.potvardi(d, zid, "wrong"))
+        self.assertEqual(poshta.potvardi(d, zid, z["token"])["status"], "potvardena")
+        q = poshta.za_rabotnika(d)
+        self.assertEqual(q[0]["address"], "example.com")
+        self.assertEqual(poshta.za_rabotnika(d), [])           # already taken
+        self.assertTrue(poshta.rezultat(d, zid, {"cards": []}, "<html></html>", "txt"))
+        self.assertTrue(sent[-1][2])                           # report has HTML
+        self.assertEqual(poshta.cheti(d, zid)["status"], "izpratena")
+        for _ in range(3):
+            poshta.nova(d, "example.com", "x@y.bg", "bg")
+        self.assertEqual(poshta.nova(d, "example.com", "x@y.bg", "bg"), (False, "email_limit"))
+
+    def test_key(self):
+        import tempfile, os
+        from praetorian import poshta
+        d = tempfile.mkdtemp()
+        self.assertFalse(poshta.proveri_kluch(d, "abc"))
+        open(os.path.join(d, "rabotnik.key"), "w").write("s3cret\n")
+        self.assertTrue(poshta.proveri_kluch(d, "s3cret"))
+        self.assertFalse(poshta.proveri_kluch(d, "nope"))
