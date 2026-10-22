@@ -12,6 +12,7 @@ Run locally:  python -m praetorian.web 8080
 
 import html
 import json
+import os
 import threading
 import time
 import urllib.parse
@@ -38,10 +39,16 @@ FORM = {
 }
 
 
+TRUST_PROXY = os.environ.get("PRAETORIAN_TRUST_PROXY") == "1"
+
+
 def _client_ip(environ):
-    # behind one trusted proxy (hosting/Cloudflare) take the first forwarded address
-    fwd = environ.get("HTTP_CF_CONNECTING_IP") or environ.get("HTTP_X_FORWARDED_FOR", "")
-    return (fwd.split(",")[0].strip() or environ.get("REMOTE_ADDR", "?"))[:64]
+    # forwarded headers are easy to fake: use them only behind a proxy we trust
+    if TRUST_PROXY:
+        fwd = environ.get("HTTP_CF_CONNECTING_IP") or environ.get("HTTP_X_FORWARDED_FOR", "")
+        if fwd:
+            return fwd.split(",")[0].strip()[:64]
+    return environ.get("REMOTE_ADDR", "?")[:64]
 
 
 def _allowed(ip):
