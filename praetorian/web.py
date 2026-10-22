@@ -113,9 +113,22 @@ SCRIPT = "<script>%s</script>" % SCRIPT_BODY
 SCRIPT_HASH = "sha256-" + base64.b64encode(hashlib.sha256(SCRIPT_BODY.encode("utf-8")).digest()).decode()
 DESC_HTML = {
     "bg": '<meta name="description" content="Безплатна пасивна проверка дали сайтът ви е засегнат от нови пробиви (PHP2Shell и др.) и какво да оправите първо. BoostWorkers Praetorian.">'
-          '<link rel="canonical" href="https://boostworkers.com/proveri/">',
+          '<link rel="canonical" href="https://boostworkers.com/proveri/">'
+          '<meta property="og:title" content="Засегнат ли е сайтът ви от PHP2Shell? Безплатна проверка">'
+          '<meta property="og:description" content="Безплатна пасивна проверка за 1 минута и какво да оправите първо. BoostWorkers Praetorian.">'
+          '<meta property="og:url" content="https://boostworkers.com/proveri/">'
+          '<meta property="og:type" content="website">'
+          '<meta property="og:image" content="https://boostworkers.com/assets/praetorian-karta.png">'
+          '<meta property="og:image:width" content="1080"><meta property="og:image:height" content="1080">'
+          '<meta name="twitter:card" content="summary_large_image">',
     "en": '<meta name="description" content="Free passive check whether your website is affected by new vulnerabilities (PHP2Shell and more) and what to fix first. BoostWorkers Praetorian.">'
-          '<link rel="canonical" href="https://boostworkers.com/proveri/?lang=en">',
+          '<link rel="canonical" href="https://boostworkers.com/proveri/?lang=en">'
+          '<meta property="og:title" content="Is your website affected by PHP2Shell? Free check">'
+          '<meta property="og:description" content="Free passive check in 1 minute and what to fix first. BoostWorkers Praetorian.">'
+          '<meta property="og:url" content="https://boostworkers.com/proveri/?lang=en">'
+          '<meta property="og:type" content="website">'
+          '<meta property="og:image" content="https://boostworkers.com/assets/praetorian-karta.png">'
+          '<meta name="twitter:card" content="summary_large_image">',
 }
 WAIT_CHECK = {"bg": "Проверявам… до 30 сек.", "en": "Checking… up to 30 s"}
 WAIT_SEND = {"bg": "Изпращам…", "en": "Sending…"}
