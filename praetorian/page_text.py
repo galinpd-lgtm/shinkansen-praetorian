@@ -22,7 +22,7 @@ METHOD = {
 <ul>
 <li>не опитваме вход, не пращаме атакуващи заявки, не сканираме портове, не натоварваме сайта;</li>
 <li>не проверяваме адреси във вътрешни мрежи;</li>
-<li>не пазим списъци „кой е засегнат“ и не публикуваме чужди слабости. Отчетът е само за този, който пита.</li>
+<li>не публикуваме чужди слабости и не даваме резултатите на никого. Отчетът е само за този, който пита. За статистика записваме кои сайтове са проверени и общия резултат — без IP и без кой е питал.</li>
 </ul>
 <h3>Две версии, един двигател</h3>
 <ul>
@@ -53,7 +53,7 @@ METHOD = {
 <ul>
 <li>no login attempts, no attack payloads, no port scans, no load;</li>
 <li>no checks of internal network addresses;</li>
-<li>no lists of "who is affected", nobody's weaknesses published. The report is only for the person asking.</li>
+<li>nobody's weaknesses are published and results are shared with nobody. The report is only for the person asking. For statistics we record which sites were checked and the overall result — no IP, not who asked.</li>
 </ul>
 <h3>Two editions, one engine</h3>
 <ul>

@@ -17,6 +17,7 @@ import hashlib
 import html
 import json
 import os
+import re
 import tempfile
 import threading
 import time
@@ -27,7 +28,7 @@ try:
 except ImportError:          # Windows (local tests) — in-process semaphore instead
     fcntl = None
 
-from . import __version__, cards, page_text, poshta, remote, report
+from . import __version__, broyach, cards, page_text, poshta, remote, report
 from .sources import Sources
 
 PER_IP_HOUR = 10
@@ -40,11 +41,11 @@ _cards = cards.load_cards()
 FORM = {
     "bg": ("Провери сайта си за пробиви", "Адрес на сайта", "Провери",
            "Безплатно. Проверяваме само каквото вижда всеки посетител, без атака и без вход. "
-           "Отчетът е само за вас — не пазим списъци и не публикуваме чужди слабости.",
+           "Отчетът е само за вас. Записваме кои сайтове са проверени (за статистика) — резултатите не публикуваме и не даваме на никого.",
            "Твърде много проверки от вас за последния час. Опитайте по-късно."),
     "en": ("Check your website for breaches", "Website address", "Check",
            "Free. We only look at what every visitor sees — no attack, no login. "
-           "The report is for you only; we keep no lists and publish nobody's weaknesses.",
+           "The report is for you only. We record which sites were checked (for statistics) — results are never published or shared.",
            "Too many checks from you in the last hour. Please try later."),
 }
 
@@ -166,7 +167,7 @@ SCRIPT_BODY = ("document.querySelectorAll('form').forEach(function(f){f.addEvent
                "b.style.opacity='.7';setTimeout(function(){b.disabled=true},0);}});});"
                "var s=document.getElementById('share');if(s){s.addEventListener('click',function(){"
                "var d={title:s.dataset.title,text:s.dataset.text,url:s.dataset.url};"
-               "if(navigator.share){navigator.share(d).catch(function(){});}"
+               "if(navigator.share){navigator.share(d).then(function(){try{navigator.sendBeacon(s.dataset.beacon)}catch(e){}}).catch(function(){});}"
                "else if(navigator.clipboard){navigator.clipboard.writeText(d.url).then(function(){s.textContent=s.dataset.copied;});}"
                "});}")
 SCRIPT = "<script>%s</script>" % SCRIPT_BODY
@@ -206,23 +207,35 @@ SHARE = {
 }
 
 
+SHARE_KANALI = [("Viber", "viber"), ("WhatsApp", "whatsapp"), ("Facebook", "facebook"),
+                ("LinkedIn", "linkedin"), ("Telegram", "telegram"), ("Email", "email")]
+
+
+def share_target(kanal, lang, after):
+    t = dict(SHARE[lang])
+    if after:
+        t["text"] = t["after_text"]
+    q = urllib.parse.quote
+    msg = t["text"] + " " + t["url"]
+    return {
+        "viber": "viber://forward?text=" + q(msg),
+        "whatsapp": "https://wa.me/?text=" + q(msg),
+        "facebook": "https://www.facebook.com/sharer/sharer.php?u=" + q(t["url"]),
+        "linkedin": "https://www.linkedin.com/sharing/share-offsite/?url=" + q(t["url"]),
+        "telegram": "https://t.me/share/url?url=" + q(t["url"]) + "&text=" + q(t["text"]),
+        "email": "mailto:?subject=" + q(t["title"]) + "&body=" + q(msg),
+    }.get(kanal)
+
+
 def share_html(lang, button=True):
     t = dict(SHARE[lang])
     if not button:                      # after a check: personal invitation, the moment people share most
         t["text"] = t["after_text"]
-    q = urllib.parse.quote
-    msg = t["text"] + " " + t["url"]
-    links = [
-        ("Viber", "viber://forward?text=" + q(msg)),
-        ("WhatsApp", "https://wa.me/?text=" + q(msg)),
-        ("Facebook", "https://www.facebook.com/sharer/sharer.php?u=" + q(t["url"])),
-        ("LinkedIn", "https://www.linkedin.com/sharing/share-offsite/?url=" + q(t["url"])),
-        ("Telegram", "https://t.me/share/url?url=" + q(t["url"]) + "&text=" + q(t["text"])),
-        ("Email", "mailto:?subject=" + q(t["title"]) + "&body=" + q(msg)),
-    ]
+    # each link goes through /s/<channel> on our site: we count the click (anonymously) and redirect
+    links = [(n, "%s/s/%s?lang=%s%s" % (poshta.BAZA, k, lang, "" if button else "&a=1")) for n, k in SHARE_KANALI]
     e = html.escape
-    btn = ('<button type="button" id="share" data-title="%s" data-text="%s" data-url="%s" data-copied="%s">%s</button>'
-           % (e(t["title"]), e(t["text"]), e(t["url"]), e(t["copied"]), e(t["btn"]))) if button else ""
+    btn = ('<button type="button" id="share" data-title="%s" data-text="%s" data-url="%s" data-copied="%s" data-beacon="%s">%s</button>'
+           % (e(t["title"]), e(t["text"]), e(t["url"]), e(t["copied"]), e(poshta.BAZA + "/s-native"), e(t["btn"]))) if button else ""
     head = "" if button else '<h2>%s</h2><p>%s</p>' % (e(t["after_title"]), e(t["after"]))
     return (head + '<div class="share">%s<span class="m">%s</span> %s</div>'
             % (btn, e(t["or"]),
@@ -390,7 +403,7 @@ def app(environ, start_response):
     headers = [("X-Content-Type-Options", "nosniff"), ("Referrer-Policy", "no-referrer"),
                ("X-Frame-Options", "DENY"),
                ("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; "
-                "script-src '%s'; form-action 'self'" % SCRIPT_HASH)]
+                "script-src '%s'; connect-src 'self'; form-action 'self'" % SCRIPT_HASH)]
 
     base = environ.get("SCRIPT_NAME", "").rstrip("/")
     if method == "GET" and base and path == "":
@@ -419,6 +432,9 @@ def app(environ, start_response):
             if res:
                 ok = poshta.rezultat(DATA_DIR, z["id"], res, report.page(res, z["lang"], _cards,
                                      extra_html=share_html(z["lang"], button=False)), report.text(res, z["lang"], _cards))
+                if ok:
+                    broyach.zapishi(DATA_DIR, "poshta_izprateni")
+                    broyach.sait(DATA_DIR, res, "imeil")
             else:
                 ok = poshta.rezultat(DATA_DIR, z["id"], None, None, None,
                                      greshka=_err(str(d.get("greshka") or "check failed"), z["lang"]))
@@ -426,11 +442,33 @@ def app(environ, start_response):
             return send("400 Bad Request", json.dumps({"error": str(ex)[:200]}), "application/json")
         return send("200 OK", json.dumps({"ok": ok}), "application/json")
 
+    if path.rstrip("/").endswith("/api/rabotnik/broyach"):
+        if not poshta.proveri_kluch(DATA_DIR, environ.get("HTTP_X_PRAETORIAN_KEY")):
+            return send("403 Forbidden", json.dumps({"error": "key"}), "application/json")
+        den = qs.get("den", [""])[0] or None
+        if den and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", den):
+            den = None
+        return send("200 OK", json.dumps({"broyach": broyach.cheti(DATA_DIR, den), "saitove": broyach.saitove(DATA_DIR, den)},
+                                         ensure_ascii=False), "application/json; charset=utf-8")
+
+    ms = re.search(r"/s/([a-z]+)$", path.rstrip("/"))
+    if ms:                                                  # share click: count, then go to the channel
+        cel = share_target(ms.group(1), lang, qs.get("a", [""])[0] == "1")
+        if not cel:
+            return send("404 Not Found", "")
+        broyach.zapishi(DATA_DIR, "spodelyane", kanal=ms.group(1))
+        start_response("302 Found", [("Location", cel), ("Content-Length", "0"), ("X-Robots-Tag", "noindex")])
+        return [b""]
+    if path.rstrip("/").endswith("/s-native"):              # the phone share sheet (counted by a beacon)
+        broyach.zapishi(DATA_DIR, "spodelyane", kanal="telefon")
+        return send("204 No Content", "")
+
     if path.rstrip("/").endswith("/potvardi"):
         z = poshta.potvardi(DATA_DIR, qs.get("id", [""])[0], qs.get("t", [""])[0])
         t = POSHTA[lang]
         if not z:
             return send("200 OK", _message_page(lang, base, "Praetorian", t["bad_link"]))
+        broyach.zapishi(DATA_DIR, "poshta_potvardeni")
         return send("200 OK", _message_page(lang, base, t["ok_title"], t["ok"] % z["address"]))
 
     if path.rstrip("/").endswith("/api/check"):
@@ -474,12 +512,15 @@ def app(environ, start_response):
             ok, kl = poshta.nova(DATA_DIR, address, email, lang, novini=first("novini") == "1")
             if not ok:
                 return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t[kl]))
+            broyach.zapishi(DATA_DIR, "poshta_zayavki")
             return send("200 OK", _message_page(lang, base, "Praetorian", t["sent"] % email))
 
         if path.rstrip("/").endswith("/otziv"):
             if not _fb_allowed(_client_ip(environ)):
                 return send("429 Too Many Requests", _form_page(lang, fb_message=page_text.FEEDBACK[lang]["too_many"], base=base))
             ok, err = save_feedback(form, lang)
+            if ok:
+                broyach.zapishi(DATA_DIR, "otzivi")
             return send("200 OK", _form_page(lang, fb_message=err, fb_ok=ok, base=base))
 
         address = form.get("address", [""])[0].strip()
@@ -490,10 +531,15 @@ def app(environ, start_response):
         except remote.CheckError as e:
             return send("200 OK", _form_page(lang, _err(str(e), lang), address, base=base))
         except Busy:
+            broyach.zapishi(DATA_DIR, "zaeto")
             return send("200 OK", _form_page(lang, BUSY[lang], address, base=base))
+        broyach.zapishi(DATA_DIR, "proverki")
+        broyach.sait(DATA_DIR, res, "onlain")
         return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang,
                                               extra_html=share_html(lang, button=False)))
 
+    if method == "GET" and path in ("", "/"):
+        broyach.zapishi(DATA_DIR, "posetenia", ref=environ.get("HTTP_REFERER", ""))
     return send("200 OK", _form_page(lang, base=base), index=(method == "GET"))
 
 

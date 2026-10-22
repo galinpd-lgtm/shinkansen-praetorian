@@ -213,3 +213,17 @@ class Poshta(unittest.TestCase):
         open(os.path.join(d, "rabotnik.key"), "w").write("s3cret\n")
         self.assertTrue(poshta.proveri_kluch(d, "s3cret"))
         self.assertFalse(poshta.proveri_kluch(d, "nope"))
+
+
+class Broyach(unittest.TestCase):
+    def test_counts(self):
+        import tempfile
+        from praetorian import broyach
+        d = tempfile.mkdtemp()
+        broyach.zapishi(d, "posetenia", ref="https://l.facebook.com/l.php?u=x")
+        broyach.zapishi(d, "posetenia", ref="https://www.linkedin.com/feed/")
+        broyach.zapishi(d, "spodelyane", kanal="viber")
+        s = list(broyach.cheti(d).values())[0]
+        self.assertEqual(s["posetenia"], 2)
+        self.assertEqual(s["ot"], {"facebook.com": 1, "linkedin.com": 1})
+        self.assertEqual(s["kanali"], {"viber": 1})
