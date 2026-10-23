@@ -12,7 +12,7 @@ METHOD = {
 </div>
 <h3>Какво означават резултатите</h3>
 <ul>
-<li><b>ЗАСЕГНАТ</b> — версията се вижда и е уязвима.</li>
+<li><b>уязвима версия</b> — видимият номер е от засегнатите. Някои хостинги (напр. с CloudLinux) слагат кръпката, без да сменят номера; тогава сайтът е защитен. Потвърждава го хостингът.</li>
 <li><b>вероятно засегнат</b> — софтуерът се вижда (напр. WordPress върху PHP), но версията е скрита. Точният отговор дава хостингът или версията за сървъра.</li>
 <li><b>зависи от хостинга</b> — за този клон няма официална поправка; решава пакетът на доставчика.</li>
 <li><b>поправен</b> / <b>не е засегнат</b> — по видимата версия.</li>
@@ -43,7 +43,7 @@ METHOD = {
 </div>
 <h3>What the results mean</h3>
 <ul>
-<li><b>AFFECTED</b> — the version is visible and vulnerable.</li>
+<li><b>vulnerable version</b> — the visible number is an affected one. Some hosts (e.g. with CloudLinux) apply the patch without changing the number; then the site is protected. Your host confirms it.</li>
 <li><b>likely affected</b> — the software is visible (e.g. WordPress on PHP) but the version is hidden. The exact answer comes from your host or the server edition.</li>
 <li><b>depends on your host</b> — no official fix for this branch; the vendor package decides.</li>
 <li><b>patched</b> / <b>not affected</b> — by the visible version.</li>

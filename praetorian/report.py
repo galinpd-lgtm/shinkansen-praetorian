@@ -6,10 +6,10 @@ from . import cards as C
 from . import versions
 
 STATUS = {
-    "bg": {C.AFFECTED: "ЗАСЕГНАТ", C.PATCHED: "поправен", C.VENDOR: "зависи от хостинга",
+    "bg": {C.AFFECTED: "УЯЗВИМА ВЕРСИЯ", C.PATCHED: "поправен", C.VENDOR: "зависи от хостинга",
            C.LIKELY: "вероятно засегнат", C.NOT_AFFECTED: "не е засегнат",
            C.NOT_VISIBLE: "не личи отвън"},
-    "en": {C.AFFECTED: "AFFECTED", C.PATCHED: "patched", C.VENDOR: "depends on your host",
+    "en": {C.AFFECTED: "VULNERABLE VERSION", C.PATCHED: "patched", C.VENDOR: "depends on your host",
            C.LIKELY: "likely affected", C.NOT_AFFECTED: "not affected",
            C.NOT_VISIBLE: "not visible from outside"},
 }
@@ -32,7 +32,8 @@ T = {
         "missing": "Липсващи защитни заглавки", "none": "няма", "yes": "да", "no": "НЕ",
         "kev": "Активно използвани слабости в този софтуер през последната година (CISA)",
         "online_note": "Проверката е пасивна: видяхме само каквото вижда всеки посетител. "
-                       "Точният отговор за PHP и пакетите дава хостингът или версията за сваляне.",
+                       "Точният отговор за PHP и пакетите дава хостингът или версията за сваляне. "
+                       "Някои хостинги (напр. с CloudLinux) слагат кръпката, без да сменят номера на версията.",
         "local_note": "Описът е направен на самата машина. Нищо не е променено и нищо не е изпратено, "
                       "освен имената и версиите на библиотеките към OSV (ако не е изключено).",
         "help": "Искате да го направим ние? BoostWorkers поправя и наблюдава — boostworkers.com",
@@ -54,7 +55,8 @@ T = {
         "missing": "Missing security headers", "none": "none", "yes": "yes", "no": "NO",
         "kev": "Actively exploited flaws in this software during the last year (CISA)",
         "online_note": "This check is passive: we saw only what every visitor sees. "
-                       "The exact answer for PHP and packages comes from your host or the downloadable edition.",
+                       "The exact answer for PHP and packages comes from your host or the downloadable edition. "
+                       "Some hosts (e.g. with CloudLinux) apply the patch without changing the version number.",
         "local_note": "The inventory was made on the machine itself. Nothing was changed and nothing was sent, "
                       "except library names and versions to OSV (unless switched off).",
         "help": "Want us to do it? BoostWorkers fixes and monitors — boostworkers.com",
@@ -83,14 +85,14 @@ HEADERS = {
 
 TODO = {
     "bg": {"title": "Какво да оправите първо", "none": "Няма спешни задачи по това, което се вижда отвън.",
-           "card": "%s: %s — поискайте от хостинга поправен PHP (писмото е по-долу).",
+           "card": "%s: %s — попитайте хостинга дали PHP е с кръпката; ако не е, поискайте я (писмото е по-долу).",
            "eol": "%s %s е без поддръжка — вече не получава поправки на сигурността. Обновете.",
            "old": "%s %s е остаряла версия (последна: %s). Обновете след архив.",
            "nohttps": "Сайтът не се отваря по защитена връзка (https). Включете сертификат.",
            "cert": "Сертификатът изтича след %d дни. Проверете автоматичното подновяване.",
            "hsts": "Добавете HSTS, за да се отваря сайтът винаги по https."},
     "en": {"title": "Fix this first", "none": "Nothing urgent in what is visible from outside.",
-           "card": "%s: %s — ask your host for a patched PHP (letter below).",
+           "card": "%s: %s — ask your host whether PHP has the patch; if not, ask for it (letter below).",
            "eol": "%s %s is end-of-life — it no longer gets security fixes. Update it.",
            "old": "%s %s is outdated (latest: %s). Update after a backup.",
            "nohttps": "The site does not open over a secure connection (https). Enable a certificate.",
