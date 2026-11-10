@@ -25,6 +25,9 @@ OT_IME = os.environ.get("PRAETORIAN_MAIL_NAME", "BoostWorkers Praetorian")
 BAZA = os.environ.get("PRAETORIAN_BASE_URL", "https://boostworkers.com/proveri")
 EMAIL_RE = re.compile(r"^[^@\s<>\"',;]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 PER_EMAIL_DAY = 3
+PER_DAY_ALL = 50              # all confirmation emails in 24 hours, from everybody together
+PAZIM_DNI = 90                # emails are kept 3 months, then erased (decision of 10.11.2026)
+SAGLASIE_VERSIA = "2026-11-10"   # version of the consent/privacy text shown on the page
 POTVARDI_ZA = 24 * 3600
 _lock = threading.Lock()
 
@@ -36,7 +39,7 @@ TXT = {
                       "BoostWorkers Praetorian · https://boostworkers.com/proveri/\nKAGAMI ЕООД, Варна · office@kagami.bg",
         "otchet_tema": "Отчет: %s — проверка за пробиви",
         "otchet_uvod": "Здравейте,\n\nЕто отчета за %s. Пълният отчет е в HTML частта на писмото.\n\n",
-        "otchet_kraj": "\n\nИскате ли да го оправим ние? Отговорете на това писмо — първата консултация е безплатна.\n"
+        "otchet_kraj": "\n\nИскате ли да го оправим ние? Вижте как: https://boostworkers.com/uslugi/\n"
                        "Проверете и друг сайт: https://boostworkers.com/proveri/\n\nBoostWorkers Praetorian · KAGAMI ЕООД, Варна · office@kagami.bg",
     },
     "en": {
@@ -46,7 +49,7 @@ TXT = {
                       "BoostWorkers Praetorian · https://boostworkers.com/proveri/?lang=en\nKAGAMI Ltd, Varna, Bulgaria · office@kagami.bg",
         "otchet_tema": "Report: %s — breach check",
         "otchet_uvod": "Hello,\n\nHere is the report for %s. The full report is in the HTML part of this email.\n\n",
-        "otchet_kraj": "\n\nWant us to fix it? Reply to this email — the first consultation is free.\n"
+        "otchet_kraj": "\n\nWant us to fix it? See how: https://en.boostworkers.com/uslugi/\n"
                        "Check another site: https://boostworkers.com/proveri/?lang=en\n\nBoostWorkers Praetorian · KAGAMI Ltd, Varna · office@kagami.bg",
     },
 }
@@ -82,36 +85,45 @@ def validen_email(e):
 
 
 def _broi_za_email(data_dir, email):
-    """How many requests this email made in the last 24 hours."""
+    """How many requests this email made in the last 24 hours, and how many were made by everybody."""
     h = _hash(email)
     ot = time.time() - 86400
-    n = 0
+    n = vsichki = 0
     for name in os.listdir(papka(data_dir)):
         if not name.endswith(".json"):
             continue
         try:
             with open(os.path.join(papka(data_dir), name), encoding="utf-8") as f:
                 z = json.load(f)
-            if z.get("email_hash") == h and z.get("sazdadena", 0) > ot:
-                n += 1
+            if z.get("sazdadena", 0) > ot:
+                vsichki += 1
+                if z.get("email_hash") == h:
+                    n += 1
         except (OSError, ValueError):
             continue
-    return n
+    return n, vsichki
 
 
 def _hash(email):
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
 
-def nova(data_dir, address, email, lang, novini=False):
-    """Create a request and send the confirmation email. Returns (ok, error_key)."""
+def nova(data_dir, address, email, lang, novini=False, saglasie_tekst=""):
+    """Create a request and send the confirmation email. Returns (ok, error_key).
+    `address` must already be a bare host name (the caller checks it) — it goes into the email."""
     email = email.strip()
+    zalichi_stari(data_dir)
     with _lock:
-        if _broi_za_email(data_dir, email) >= PER_EMAIL_DAY:
+        moi, vsichki = _broi_za_email(data_dir, email)
+        if moi >= PER_EMAIL_DAY:
             return False, "email_limit"
+        if vsichki >= PER_DAY_ALL:
+            return False, "day_limit"
         z = {"id": secrets.token_hex(16), "token": secrets.token_urlsafe(24), "status": "chaka_potvarzhdenie",
              "address": address, "email": email, "email_hash": _hash(email), "lang": lang,
-             "novini": bool(novini), "sazdadena": time.time(), "istoria": [["sazdadena", time.time()]]}
+             "novini": False, "sazdadena": time.time(), "istoria": [["sazdadena", time.time()]],
+             # proof of consent: when, and for which text (the box on the page must be ticked to get here)
+             "saglasie": {"chas": time.time(), "versia": SAGLASIE_VERSIA, "tekst": saglasie_tekst[:400]}}
         zapishi(data_dir, z)
     link = "%s/potvardi?id=%s&t=%s%s" % (BAZA, z["id"], z["token"], "&lang=en" if lang == "en" else "")
     t = TXT[lang]
@@ -124,14 +136,47 @@ def nova(data_dir, address, email, lang, novini=False):
     return True, ""
 
 
+def zalichi_stari(data_dir, dni=PAZIM_DNI, sega=None):
+    """Retention: requests older than `dni` days lose the email, its hash and the token; the rest
+    (site, time, status) stays for statistics. Runs at most once a day. Returns how many were erased."""
+    sega = sega or time.time()
+    belezhka = os.path.join(papka(data_dir), ".zalichavane")
+    try:
+        if sega - os.path.getmtime(belezhka) < 86400:
+            return 0
+    except OSError:
+        pass
+    n = 0
+    with _lock:
+        for name in os.listdir(papka(data_dir)):
+            if not name.endswith(".json"):
+                continue
+            try:
+                z = cheti(data_dir, name[:-5])
+            except (OSError, ValueError):
+                continue
+            if z.get("email") and sega - z.get("sazdadena", sega) > dni * 86400:
+                for k in ("email", "email_hash", "token"):
+                    z.pop(k, None)
+                if z.get("status") in ("chaka_potvarzhdenie", "potvardena", "v_rabota"):
+                    z["status"] = "iztekla"
+                z["zalicheno"] = sega
+                z.setdefault("istoria", []).append(["zalicheno", sega])
+                zapishi(data_dir, z)
+                n += 1
+        with open(belezhka, "w", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%dT%H:%M:%S"))
+    return n
+
+
 def potvardi(data_dir, zid, token):
     """Confirmation link clicked. Returns the request or None."""
     try:
         z = cheti(data_dir, zid)
     except (OSError, ValueError):
         return None
-    if not hmac.compare_digest(str(z.get("token", "")), str(token or "")):
-        return None
+    if not z.get("token") or not hmac.compare_digest(str(z["token"]), str(token or "")):
+        return None                         # also: an erased (expired) request has no token any more
     if z["status"] == "chaka_potvarzhdenie":
         if time.time() - z["sazdadena"] > POTVARDI_ZA:
             return None
@@ -143,6 +188,7 @@ def potvardi(data_dir, zid, token):
 
 def za_rabotnika(data_dir, max_n=5):
     """Confirmed requests for the worker (marks them 'v_rabota'; stale ones are offered again after 15 min)."""
+    zalichi_stari(data_dir)                # retention runs with the worker's regular visit (at most once a day)
     out = []
     with _lock:
         for name in sorted(os.listdir(papka(data_dir))):

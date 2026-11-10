@@ -41,7 +41,7 @@ Each run writes a JSON file (for machines) and an HTML report (for people). Exit
 ## What it never does
 
 - no login attempts, no exploit payloads, no port scans, no load (pauses between requests);
-- the online edition makes at most 3 ordinary GET requests and refuses internal network addresses;
+- the online edition always starts at the home page and makes at most 6 ordinary GET requests (usually 1–3: the page, the site's own redirects and, only for WordPress, its public feed) and refuses internal network addresses;
 - the local edition only reads: it changes nothing, uploads nothing; the only data sent out is library names and versions to OSV (`--no-osv` switches this off).
 
 ## Breach cards

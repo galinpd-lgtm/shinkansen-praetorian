@@ -90,6 +90,127 @@ class Reports(unittest.TestCase):
         self.assertEqual(d["cards"][0]["after"], "patched")
 
 
+class Popravki2026_11_10(unittest.TestCase):
+    """С1–С4 (10.11.2026): honest request count, no visitor path, safe email, consent and retention."""
+
+    def test_visitor_path_is_dropped(self):
+        from praetorian import remote
+        self.assertEqual(remote.normalize("example.com/.env"), ("https", "example.com", "/"))
+        self.assertEqual(remote.normalize("http://example.com/wp-login.php?x=1"), ("http", "example.com", "/"))
+        self.assertEqual(remote.normalize("https://example.com/en/", keep_path=True)[2], "/en/")
+
+    def test_request_count_matches_the_text(self):
+        from praetorian import remote, page_text
+        calls = []
+        def fake(scheme, host, path):
+            calls.append(path)
+            n = len(calls)
+            if n <= remote.MAX_REDIRECTS:
+                return {"status": 302, "headers": {"location": "/r%d" % n}, "set_cookie": [], "body": "", "cert": None, "tls": None}
+            return {"status": 200, "headers": {}, "set_cookie": [], "body": "<html>wp-content/</html>", "cert": None, "tls": None}
+        old, oldsleep = remote.fetch, remote.time.sleep
+        remote.fetch, remote.time.sleep = fake, lambda s: None
+        try:
+            remote.check("example.com/secret-path", None, [])
+        finally:
+            remote.fetch, remote.time.sleep = old, oldsleep
+        self.assertEqual(calls[0], "/")                       # never the path typed by the visitor
+        self.assertLessEqual(len(calls), 6)
+        self.assertEqual(len(calls), 6)                       # worst case: 1 + 4 redirects + feed
+        for lang in ("bg", "en"):
+            self.assertIn("6", page_text.METHOD[lang])
+            self.assertNotIn("3 ordinary requests, with", page_text.METHOD[lang])
+            self.assertNotIn("Най-много 3", page_text.METHOD[lang])
+
+    def test_email_text_consent_and_limits(self):
+        import tempfile, os
+        from praetorian import poshta
+        d = tempfile.mkdtemp()
+        sent = []
+        old = poshta.izprati
+        poshta.izprati = lambda do, tema, text, html_=None: sent.append((do, tema, text))
+        try:
+            ok, _ = poshta.nova(d, "example.com", "a@b.bg", "bg", novini=True, saglasie_tekst="Съгласен съм")
+            self.assertTrue(ok)
+            zid = [f[:-5] for f in os.listdir(poshta.papka(d)) if f.endswith(".json")][0]
+            z = poshta.cheti(d, zid)
+            self.assertFalse(z["novini"])                     # no news list exists, so nothing is collected for it
+            self.assertEqual(z["saglasie"]["versia"], poshta.SAGLASIE_VERSIA)
+            self.assertEqual(z["saglasie"]["tekst"], "Съгласен съм")
+            self.assertGreater(z["saglasie"]["chas"], 0)
+            for lang in ("bg", "en"):
+                self.assertNotIn("безплатна", poshta.TXT[lang]["otchet_kraj"])
+                self.assertNotIn("free", poshta.TXT[lang]["otchet_kraj"])
+                self.assertIn("boostworkers.com/uslugi/", poshta.TXT[lang]["otchet_kraj"])
+            oldcap = poshta.PER_DAY_ALL
+            poshta.PER_DAY_ALL = 3
+            try:
+                poshta.nova(d, "example.com", "c@d.bg", "bg")
+                poshta.nova(d, "example.com", "e@f.bg", "bg")
+                self.assertEqual(poshta.nova(d, "example.com", "g@h.bg", "bg"), (False, "day_limit"))
+            finally:
+                poshta.PER_DAY_ALL = oldcap
+        finally:
+            poshta.izprati = old
+
+    def test_form_takes_only_an_existing_host(self):
+        import io, tempfile
+        from praetorian import web, poshta, remote
+        d = tempfile.mkdtemp()
+        sent = []
+        old = (poshta.izprati, remote.public_ip, web.DATA_DIR)
+        poshta.izprati = lambda do, tema, text, html_=None: sent.append((do, tema, text))
+        web.DATA_DIR = d
+        def post(address):
+            body = ("address=%s&email=a%%40b.bg&consent=1&novini=1" % address).encode()
+            env = {"REQUEST_METHOD": "POST", "PATH_INFO": "/poshta", "QUERY_STRING": "lang=bg", "REMOTE_ADDR": "198.51.100.%d" % (len(sent) + 7),
+                   "CONTENT_TYPE": "application/x-www-form-urlencoded", "CONTENT_LENGTH": str(len(body)), "wsgi.input": io.BytesIO(body)}
+            return b"".join(web.app(env, lambda s, h: None)).decode("utf-8")
+        try:
+            remote.public_ip = lambda host: "93.184.216.34"
+            post("example.com/KUPETE-EVTINO-TUK")
+            self.assertEqual(len(sent), 1)
+            self.assertNotIn("KUPETE", sent[0][1] + sent[0][2])   # the visitor's text never reaches the email
+            self.assertIn("example.com", sent[0][1])
+            def nyama(host):
+                raise remote.CheckError("the address does not exist (DNS)")
+            remote.public_ip = nyama
+            post("nyama-takav-sait.example")
+            self.assertEqual(len(sent), 1)                        # no email for a site that does not exist
+            page = b"".join(web.app({"REQUEST_METHOD": "GET", "PATH_INFO": "/", "QUERY_STRING": ""}, lambda s, h: None)).decode("utf-8")
+            self.assertNotIn('name="novini"', page)
+            self.assertIn("3 месеца", page)
+        finally:
+            poshta.izprati, remote.public_ip, web.DATA_DIR = old
+
+    def test_retention_three_months(self):
+        import tempfile, os, json, time
+        from praetorian import poshta, web
+        d = tempfile.mkdtemp()
+        old = poshta.izprati
+        poshta.izprati = lambda *a, **k: None
+        try:
+            poshta.nova(d, "example.com", "a@b.bg", "bg")
+        finally:
+            poshta.izprati = old
+        zid = [f[:-5] for f in os.listdir(poshta.papka(d)) if f.endswith(".json")][0]
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 80 * 86400), 0)
+        os.remove(os.path.join(poshta.papka(d), ".zalichavane"))
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 91 * 86400), 1)
+        z = poshta.cheti(d, zid)
+        self.assertNotIn("email", z); self.assertNotIn("email_hash", z); self.assertNotIn("token", z)
+        self.assertEqual(z["address"], "example.com")             # the statistics stay
+        self.assertIsNone(poshta.potvardi(d, zid, ""))             # an erased request cannot be confirmed
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 92 * 86400), 0)   # once a day at most
+        with open(os.path.join(d, "otzivi.jsonl"), "w", encoding="utf-8") as f:
+            f.write(json.dumps({"time": "2026-07-01T10:00:00", "lang": "bg", "message": "стар", "name": "Иван", "email": "i@x.bg", "consent": True}, ensure_ascii=False) + "\n")
+            f.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "lang": "bg", "message": "нов", "name": "Мария", "email": "m@x.bg", "consent": True}, ensure_ascii=False) + "\n")
+        self.assertEqual(web.zalichi_otzivi(d), 1)
+        recs = [json.loads(x) for x in open(os.path.join(d, "otzivi.jsonl"), encoding="utf-8").read().splitlines()]
+        self.assertEqual((recs[0]["name"], recs[0]["email"], recs[0]["message"]), ("", "", "стар"))
+        self.assertEqual(recs[1]["name"], "Мария")
+
+
 if __name__ == "__main__":
     unittest.main()
 

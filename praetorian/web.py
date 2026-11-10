@@ -301,12 +301,12 @@ POSHTA = {
     "bg": {"title": "Или: получете отчета на имейл", "intro": "Не искате да чакате? Ще ви изпратим отчета до няколко минути.",
            "address": "Адрес на сайта", "email": "Вашият имейл", "send": "Изпратете ми отчета",
            "consent": "Съгласен/съгласна съм имейлът ми да се ползва за изпращане на този отчет.",
-           "novini": "Пишете ми и при нов голям пробив (по желание; може да се откажете с един отговор).",
-           "privacy": "Първо ще получите писмо с връзка за потвърждение — без нея нищо не се изпраща. Пазим имейла само за отчета "
-                      "(и за новините, ако сте отметнали). Не го даваме на никого. Изтриване: office@kagami.bg.",
+           "privacy": "Първо ще получите писмо с връзка за потвърждение — без нея нищо не се изпраща. Пазим имейла само за отчета, "
+                      "до 3 месеца — после се заличава автоматично. Не го даваме на никого. По-ранно изтриване: office@kagami.bg.",
            "sent": "Изпратихме писмо за потвърждение на %s. Отворете връзката в него — отчетът идва след това.",
            "bad_email": "Моля, напишете валиден имейл.", "need_consent": "Отметнете съгласието, за да ви изпратим отчета.",
            "email_limit": "За този имейл днес вече има няколко заявки. Опитайте утре.",
+           "day_limit": "Днес вече изпратихме много отчети по имейл. Проверете сайта направо горе или опитайте утре.",
            "mail_error": "Не успяхме да изпратим писмото. Пишете ни на office@kagami.bg.",
            "too_many": "Твърде много заявки от вас за последния час. Опитайте по-късно.",
            "ok_title": "Потвърдено!", "ok": "Отчетът за %s ще пристигне на имейла ви до няколко минути. Проверете и папка „Спам“.",
@@ -314,12 +314,12 @@ POSHTA = {
     "en": {"title": "Or: get the report by email", "intro": "Don't want to wait? We will email you the report within a few minutes.",
            "address": "Website address", "email": "Your email", "send": "Email me the report",
            "consent": "I agree that my email is used to send this report.",
-           "novini": "Also write to me when a new big breach comes out (optional; one reply unsubscribes).",
-           "privacy": "First you get an email with a confirmation link — nothing is sent without it. We keep the email only for the report "
-                      "(and the news, if ticked). We share it with nobody. To delete: office@kagami.bg.",
+           "privacy": "First you get an email with a confirmation link — nothing is sent without it. We keep the email only for the report, "
+                      "for up to 3 months — then it is erased automatically. We share it with nobody. To delete earlier: office@kagami.bg.",
            "sent": "We sent a confirmation email to %s. Open the link in it — the report follows.",
            "bad_email": "Please enter a valid email.", "need_consent": "Please tick the consent box so we can send the report.",
            "email_limit": "This email already made several requests today. Please try tomorrow.",
+           "day_limit": "We already sent many reports by email today. Check the site directly above or try tomorrow.",
            "mail_error": "We could not send the email. Write to office@kagami.bg.",
            "too_many": "Too many requests from you in the last hour. Please try later.",
            "ok_title": "Confirmed!", "ok": "The report for %s will reach your inbox within a few minutes. Check the spam folder too.",
@@ -335,11 +335,10 @@ def _poshta_html(lang, base, value="", message=""):
             '<label>%s<input name="address" placeholder="example.bg" value="%s" required maxlength="300"></label>'
             '<label>%s<input name="email" type="email" required maxlength="200" autocomplete="email"></label>'
             '<label class="cb"><input type="checkbox" name="consent" value="1" required> %s</label>'
-            '<label class="cb"><input type="checkbox" name="novini" value="1"> %s</label>'
             '<div class="hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>'
             '<button data-wait="%s">%s</button></form><p class="err">%s</p><p class="m">%s</p></section>'
             % (e(t["title"]), e(t["intro"]), e(base), lang, e(t["address"]), e(value), e(t["email"]), e(t["consent"]),
-               e(t["novini"]), e(WAIT_SEND[lang]), e(t["send"]), e(message), e(t["privacy"])))
+               e(WAIT_SEND[lang]), e(t["send"]), e(message), e(t["privacy"])))
 
 
 def _message_page(lang, base, title, text):
@@ -370,6 +369,53 @@ def _fb_allowed(ip):
         hits.append(now)
         _fb_hits[ip] = hits
         return True
+
+
+def zalichi_otzivi(data_dir=None, dni=None, sega=None):
+    """Retention for feedback: after 3 months the name and email are erased; the text stays.
+    Runs at most once a day. Returns how many records were changed."""
+    data_dir = data_dir or DATA_DIR
+    dni = dni or poshta.PAZIM_DNI
+    sega = sega or time.time()
+    p = os.path.join(data_dir, "otzivi.jsonl")
+    belezhka = os.path.join(data_dir, ".zalichavane_otzivi")
+    try:
+        if sega - os.path.getmtime(belezhka) < 86400:
+            return 0
+    except OSError:
+        pass
+    n = 0
+    with _lock:
+        try:
+            with open(p, encoding="utf-8") as f:
+                redove = f.read().splitlines()
+        except OSError:
+            redove = None
+        if redove is not None:
+            novi = []
+            for red in redove:
+                try:
+                    rec = json.loads(red)
+                    star = sega - time.mktime(time.strptime(rec["time"], "%Y-%m-%dT%H:%M:%S")) > dni * 86400
+                    if star and (rec.get("name") or rec.get("email")):
+                        rec["name"], rec["email"], rec["zalicheno"] = "", "", time.strftime("%Y-%m-%d", time.localtime(sega))
+                        red = json.dumps(rec, ensure_ascii=False)
+                        n += 1
+                except (ValueError, KeyError, TypeError):
+                    pass
+                novi.append(red)
+            if n:
+                tmp = p + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    f.write("\n".join(novi) + "\n")
+                os.replace(tmp, p)
+        try:
+            os.makedirs(data_dir, mode=0o700, exist_ok=True)
+            with open(belezhka, "w", encoding="utf-8") as f:
+                f.write(time.strftime("%Y-%m-%dT%H:%M:%S"))
+        except OSError:
+            pass
+    return n
 
 
 def save_feedback(form, lang):
@@ -423,6 +469,7 @@ def app(environ, start_response):
         if not poshta.proveri_kluch(DATA_DIR, environ.get("HTTP_X_PRAETORIAN_KEY")):
             return send("403 Forbidden", json.dumps({"error": "key"}), "application/json")
         if path.rstrip("/").endswith("/opashka"):
+            zalichi_otzivi()
             return send("200 OK", json.dumps(poshta.za_rabotnika(DATA_DIR), ensure_ascii=False), "application/json; charset=utf-8")
         try:
             size = min(int(environ.get("CONTENT_LENGTH") or 0), 2_000_000)
@@ -501,15 +548,16 @@ def app(environ, start_response):
                 return send("200 OK", _message_page(lang, base, "Praetorian", t["sent"] % ""))
             if not _fb_allowed("m:" + _client_ip(environ)):
                 return send("429 Too Many Requests", _form_page(lang, base=base, value=address, mail_message=t["too_many"]))
-            try:
-                remote.normalize(address)
+            try:                                     # only the host name goes into the email, and only if it exists
+                _, host, _ = remote.normalize(address)
+                remote.public_ip(host)
             except remote.CheckError as ex:
                 return send("200 OK", _form_page(lang, base=base, value=address, mail_message=_err(str(ex), lang)))
             if not poshta.validen_email(email):
                 return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t["bad_email"]))
             if first("consent") != "1":
                 return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t["need_consent"]))
-            ok, kl = poshta.nova(DATA_DIR, address, email, lang, novini=first("novini") == "1")
+            ok, kl = poshta.nova(DATA_DIR, host, email, lang, saglasie_tekst=t["consent"] + " " + t["privacy"])
             if not ok:
                 return send("200 OK", _form_page(lang, base=base, value=address, mail_message=t[kl]))
             broyach.zapishi(DATA_DIR, "poshta_zayavki")

@@ -2,7 +2,9 @@
 
 Rules (never broken):
   * only ordinary GET requests that any visitor or search engine makes;
-  * at most 3 requests per check, with pauses; ports 80/443 only;
+  * at most 6 requests per check (usually 1–3), with pauses: the home page, up to 4 redirects
+    and, only for WordPress, the public feed; ports 80/443 only;
+  * the check always starts at the home page — a path typed by the visitor is not requested;
   * no login attempts, no exploit payloads, no downloading of private data;
   * only public internet addresses (no internal networks).
 """
@@ -30,7 +32,9 @@ class CheckError(Exception):
 
 # --- safe fetching -----------------------------------------------------------
 
-def normalize(address):
+def normalize(address, keep_path=False):
+    """Scheme, host and path. A path typed by the visitor is dropped (the check starts at the home
+    page); only our own redirect following keeps the path the site itself sent us to."""
     address = (address or "").strip()
     if not address:
         raise CheckError("empty address")
@@ -43,7 +47,7 @@ def normalize(address):
         raise CheckError("only ports 80 and 443")
     if u.username or u.password:
         raise CheckError("addresses with passwords are not accepted")
-    return u.scheme, u.hostname.lower().rstrip("."), (u.path or "/")
+    return u.scheme, u.hostname.lower().rstrip("."), ((u.path or "/") if keep_path else "/")
 
 
 def public_ip(host):
@@ -120,7 +124,10 @@ def fetch(scheme, host, path):
     return out
 
 
-def fetch_follow(address, max_redirects=4):
+MAX_REDIRECTS = 4     # so one check is at most 1 + 4 + 1 (feed) = 6 requests
+
+
+def fetch_follow(address, max_redirects=MAX_REDIRECTS):
     scheme, host, path = normalize(address)
     chain = []
     for _ in range(max_redirects + 1):
@@ -129,7 +136,7 @@ def fetch_follow(address, max_redirects=4):
         loc = r["headers"].get("location")
         if r["status"] in (301, 302, 303, 307, 308) and loc:
             nxt = urllib.parse.urljoin("%s://%s%s" % (scheme, host, path), loc)
-            scheme, host, path = normalize(nxt)
+            scheme, host, path = normalize(nxt, keep_path=True)
             time.sleep(PAUSE / 2)
             continue
         r.update(final_scheme=scheme, final_host=host, final_path=path, chain=chain)

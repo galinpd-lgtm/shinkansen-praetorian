@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "praetorian-breachcheck"
-version = "0.1.0"
+version = "0.1.1"
 description = "Free, passive breach checks for websites and full version inventory for servers (BoostWorkers)"
 readme = "README.md"
 license = {text = "Apache-2.0"}

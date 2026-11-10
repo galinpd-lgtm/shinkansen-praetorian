@@ -6,7 +6,7 @@ METHOD = {
 <p>Когато излезе нов голям пробив, за часове казваме на собствениците на сайтове дали ги засяга и какво да направят. Безплатно и на прост език.</p>
 <div class="steps">
 <div class="st"><b>1 · Разбери</b>Четем само първични източници: съобщението на производителя (напр. php.net), каталога на CISA за активно използвани слабости, NVD/CVE, бюлетините на хостинг панелите и дистрибуциите. Медиите са само сигнал. Записваме всичко в „карта на пробива“: какво е, кой софтуер и версии, коя версия го поправя, как личи отвън, какво да направиш. Без източник няма карта.</div>
-<div class="st"><b>2 · Провери</b>Гледаме сайта само отвън, както всеки посетител или търсачка: заглавките на отговора, „generator“ в страницата, публичните пътища (напр. на WordPress), версиите в адресите на скриптовете, сертификата и защитните заглавки. Най-много 3 обикновени заявки с паузи.</div>
+<div class="st"><b>2 · Провери</b>Гледаме сайта само отвън, както всеки посетител или търсачка: заглавките на отговора, „generator“ в страницата, версиите в адресите на скриптовете, сертификата и защитните заглавки. Винаги започваме от началната страница. Обикновено 1–3 обикновени заявки, никога повече от 6 (страницата, пренасочванията на самия сайт и — само при WordPress — публичният му фийд), с паузи.</div>
 <div class="st"><b>3 · Предложи</b>Три нива: <i>сам</i> (какво можеш да направиш в панела си), <i>с хостинга</i> (готово писмо за копиране) и <i>с нас</i> (ние поправяме и наблюдаваме). Казваме и кое <b>не</b> трябва да се прави: има „решения“, които запушват една дупка и отварят две.</div>
 <div class="st"><b>4 · Докажи</b>След поправката проверката се пуска отново. Версията за сървъра прави сравнение „преди → след“.</div>
 </div>
@@ -37,7 +37,7 @@ METHOD = {
 <p>When a big new vulnerability comes out, within hours we tell website owners whether it affects them and what to do. Free and in plain words.</p>
 <div class="steps">
 <div class="st"><b>1 · Understand</b>Only primary sources: the vendor notice (e.g. php.net), the CISA catalog of exploited vulnerabilities, NVD/CVE, hosting panel and distribution bulletins. Media are only a signal. Everything goes into a "breach card": what it is, which software and versions, which version fixes it, how it shows from outside, what to do. No source, no card.</div>
-<div class="st"><b>2 · Check</b>We look only from outside, like any visitor or search engine: response headers, the page "generator", public paths (e.g. WordPress), versions in script URLs, the certificate and security headers. At most 3 ordinary requests, with pauses.</div>
+<div class="st"><b>2 · Check</b>We look only from outside, like any visitor or search engine: response headers, the page "generator", versions in script URLs, the certificate and security headers. We always start at the home page. Usually 1–3 ordinary requests, never more than 6 (the page, the site's own redirects and, only for WordPress, its public feed), with pauses.</div>
 <div class="st"><b>3 · Suggest</b>Three levels: <i>yourself</i> (what to do in your panel), <i>with your host</i> (a ready letter to copy) and <i>with us</i> (we fix and monitor). We also say what <b>not</b> to do: some "fixes" close one hole and open two.</div>
 <div class="st"><b>4 · Prove</b>After the fix, run the check again. The server edition compares "before → after".</div>
 </div>
@@ -74,8 +74,8 @@ FEEDBACK = {
         "email": "Имейл (по желание, само ако искате отговор)",
         "consent": "Съгласен/съгласна съм имейлът ми да се ползва само за отговор на това съобщение.",
         "send": "Изпрати",
-        "privacy": "Пазим само текста, а име и имейл само ако ги напишете. Не ги даваме на никого и не пращаме реклами. "
-                   "За изтриване: office@kagami.bg.",
+        "privacy": "Пазим текста, а име и имейл само ако ги напишете. Името и имейлът се заличават автоматично след 3 месеца. "
+                   "Не ги даваме на никого и не пращаме реклами. За по-ранно изтриване: office@kagami.bg.",
         "thanks": "Благодарим! Съобщението е получено.",
         "empty": "Моля, напишете съобщение.",
         "need_consent": "За да ви отговорим на имейла, отбележете съгласието.",
@@ -90,8 +90,8 @@ FEEDBACK = {
         "email": "Email (optional, only if you want an answer)",
         "consent": "I agree that my email is used only to answer this message.",
         "send": "Send",
-        "privacy": "We keep only the text, plus name and email if you write them. We share them with nobody and send no ads. "
-                   "To delete: office@kagami.bg.",
+        "privacy": "We keep the text, plus name and email if you write them. Name and email are erased automatically after 3 months. "
+                   "We share them with nobody and send no ads. To delete earlier: office@kagami.bg.",
         "thanks": "Thank you! Your message was received.",
         "empty": "Please write a message.",
         "need_consent": "To answer by email, please tick the consent box.",
