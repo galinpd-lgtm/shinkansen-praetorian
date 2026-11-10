@@ -102,7 +102,7 @@ class Popravki2026_11_10(unittest.TestCase):
     def test_request_count_matches_the_text(self):
         from praetorian import remote, page_text
         calls = []
-        def fake(scheme, host, path):
+        def fake(scheme, host, path, deadline=None):
             calls.append(path)
             n = len(calls)
             if n <= remote.MAX_REDIRECTS:
@@ -209,6 +209,32 @@ class Popravki2026_11_10(unittest.TestCase):
         recs = [json.loads(x) for x in open(os.path.join(d, "otzivi.jsonl"), encoding="utf-8").read().splitlines()]
         self.assertEqual((recs[0]["name"], recs[0]["email"], recs[0]["message"]), ("", "", "стар"))
         self.assertEqual(recs[1]["name"], "Мария")
+
+    def test_small_defects(self):
+        """С10: bad port → clear error; total time budget; key with other alphabets; confirmation counted once."""
+        import tempfile, os, time
+        from praetorian import remote, poshta
+        for addr in ("example.com:abc", "example.com:99999", "http://[::1"):
+            with self.assertRaises(remote.CheckError):
+                remote.normalize(addr)
+        with self.assertRaises(remote.CheckError):
+            remote.fetch("https", "example.com", "/", deadline=time.time() - 1)     # no time left → no request at all
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "rabotnik.key"), "w", encoding="utf-8") as f:
+            f.write("s3cret-key\n")
+        self.assertFalse(poshta.proveri_kluch(d, "ключ"))
+        self.assertTrue(poshta.proveri_kluch(d, "s3cret-key"))
+        old = poshta.izprati
+        poshta.izprati = lambda *a, **k: None
+        try:
+            poshta.nova(d, "example.com", "a@b.bg", "bg")
+        finally:
+            poshta.izprati = old
+        zid = [f[:-5] for f in os.listdir(poshta.papka(d)) if f.endswith(".json")][0]
+        tok = poshta.cheti(d, zid)["token"]
+        self.assertTrue(poshta.potvardi(d, zid, tok)["_sega"])
+        self.assertFalse(poshta.potvardi(d, zid, tok)["_sega"])                      # second opening: same page, not counted
+        self.assertNotIn("_sega", poshta.cheti(d, zid))
 
 
 if __name__ == "__main__":

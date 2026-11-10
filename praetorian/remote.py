@@ -24,6 +24,7 @@ MAX_BODY = 1_500_000
 TIMEOUT = 12          # per request; most sites answer in 1–5 s
 FEED_BUDGET = 6       # seconds: if the first answer took longer, the extra feed request is skipped
 PAUSE = 1.0
+TOTAL_BUDGET = 25     # seconds for one whole check: a slow site cannot hold a place for long
 
 
 class CheckError(Exception):
@@ -40,10 +41,17 @@ def normalize(address, keep_path=False):
         raise CheckError("empty address")
     if "://" not in address:
         address = "https://" + address
-    u = urllib.parse.urlsplit(address)
+    try:
+        u = urllib.parse.urlsplit(address)
+    except ValueError:                   # e.g. a broken IPv6 address
+        raise CheckError("only http/https website addresses")
     if u.scheme not in ("http", "https") or not u.hostname:
         raise CheckError("only http/https website addresses")
-    if u.port not in (None, 80, 443):
+    try:
+        port = u.port
+    except ValueError:                   # "example.com:abc", ":99999" — not a port at all
+        raise CheckError("only ports 80 and 443")
+    if port not in (None, 80, 443):
         raise CheckError("only ports 80 and 443")
     if u.username or u.password:
         raise CheckError("addresses with passwords are not accepted")
@@ -92,20 +100,34 @@ class _PinnedHTTP(http.client.HTTPConnection):
         self.sock = socket.create_connection((self._ip, 80), self.timeout)
 
 
-def fetch(scheme, host, path):
-    """One GET. Returns dict(status, headers, body, cert, tls, tls_error)."""
+def fetch(scheme, host, path, deadline=None):
+    """One GET. Returns dict(status, headers, body, cert, tls, tls_error).
+    `deadline` (time.time() value): the request gets only the time that is left, and the body is read
+    in pieces so that a site answering one byte at a time cannot keep the check going."""
+    left = TIMEOUT if deadline is None else min(TIMEOUT, deadline - time.time())
+    if left <= 0.5:
+        raise CheckError("the site did not answer: TimeoutError")
     ip = public_ip(host)
     tls_error = None
     if scheme == "https":
         ctx = ssl.create_default_context()
-        conn = _PinnedHTTPS(host, ip, timeout=TIMEOUT, context=ctx)
+        conn = _PinnedHTTPS(host, ip, timeout=left, context=ctx)
     else:
-        conn = _PinnedHTTP(host, ip, timeout=TIMEOUT)
+        conn = _PinnedHTTP(host, ip, timeout=left)
     try:
         conn.request("GET", path, headers={
             "User-Agent": UA, "Accept": "text/html,*/*;q=0.5", "Accept-Encoding": "identity"})
         r = conn.getresponse()
-        body = r.read(MAX_BODY)
+        parts, size = [], 0
+        while size < MAX_BODY:
+            if deadline is not None and time.time() > deadline:
+                raise CheckError("the site did not answer: TimeoutError")
+            chunk = r.read(min(65536, MAX_BODY - size))
+            if not chunk:
+                break
+            parts.append(chunk)
+            size += len(chunk)
+        body = b"".join(parts)
         out = {
             "status": r.status,
             "headers": {k.lower(): v for k, v in r.getheaders()},
@@ -127,11 +149,11 @@ def fetch(scheme, host, path):
 MAX_REDIRECTS = 4     # so one check is at most 1 + 4 + 1 (feed) = 6 requests
 
 
-def fetch_follow(address, max_redirects=MAX_REDIRECTS):
+def fetch_follow(address, max_redirects=MAX_REDIRECTS, deadline=None):
     scheme, host, path = normalize(address)
     chain = []
     for _ in range(max_redirects + 1):
-        r = fetch(scheme, host, path)
+        r = fetch(scheme, host, path, deadline)
         chain.append("%s://%s%s %s" % (scheme, host, path, r["status"]))
         loc = r["headers"].get("location")
         if r["status"] in (301, 302, 303, 307, 308) and loc:
@@ -233,7 +255,8 @@ def check(address, src=None, card_list=None):
     card_list = card_list if card_list is not None else cards.load_cards()
     started = time.strftime("%Y-%m-%dT%H:%M:%S")
     t0 = time.time()
-    resp = fetch_follow(address)
+    deadline = t0 + TOTAL_BUDGET
+    resp = fetch_follow(address, deadline=deadline)
     found = detect(resp)
 
     # one extra, ordinary request: the WordPress feed shows the version
@@ -241,7 +264,7 @@ def check(address, src=None, card_list=None):
     if "wordpress" in found and not found["wordpress"]["version"] and time.time() - t0 < FEED_BUDGET:
         time.sleep(PAUSE)
         try:
-            feed = fetch(resp["final_scheme"], resp["final_host"], "/feed/")
+            feed = fetch(resp["final_scheme"], resp["final_host"], "/feed/", deadline)
             m = _FEEDGEN.search(feed["body"])
             if m:
                 found["wordpress"] = {"version": m.group(1), "evidence": "RSS feed generator"}

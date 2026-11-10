@@ -177,12 +177,15 @@ def potvardi(data_dir, zid, token):
         return None
     if not z.get("token") or not hmac.compare_digest(str(z["token"]), str(token or "")):
         return None                         # also: an erased (expired) request has no token any more
+    z["_sega"] = False                         # True only the first time the link is opened (for the counter)
     if z["status"] == "chaka_potvarzhdenie":
         if time.time() - z["sazdadena"] > POTVARDI_ZA:
             return None
         z["status"] = "potvardena"
         z["istoria"].append(["potvardena", time.time()])
+        z.pop("_sega")
         zapishi(data_dir, z)
+        z["_sega"] = True
     return z
 
 
@@ -255,4 +258,5 @@ def proveri_kluch(data_dir, podaden):
             k = f.read().strip()
     except OSError:
         return False
-    return bool(k) and hmac.compare_digest(k, (podaden or "").strip())
+    # compared as bytes: a key with non-Latin characters is simply wrong, not a server error
+    return bool(k) and hmac.compare_digest(k.encode("utf-8"), (podaden or "").strip().encode("utf-8", "replace"))

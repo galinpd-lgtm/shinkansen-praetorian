@@ -516,7 +516,8 @@ def app(environ, start_response):
         t = POSHTA[lang]
         if not z:
             return send("200 OK", _message_page(lang, base, "Praetorian", t["bad_link"]))
-        broyach.zapishi(DATA_DIR, "poshta_potvardeni")
+        if z.get("_sega"):                                 # counted once, not at every opening of the link
+            broyach.zapishi(DATA_DIR, "poshta_potvardeni")
         return send("200 OK", _message_page(lang, base, t["ok_title"], t["ok"] % z["address"]))
 
     if path.rstrip("/").endswith("/api/check"):
