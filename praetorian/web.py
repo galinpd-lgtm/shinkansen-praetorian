@@ -343,7 +343,7 @@ def _poshta_html(lang, base, value="", message=""):
 
 def _message_page(lang, base, title, text):
     e = html.escape
-    return ('<!doctype html><html lang="%s"><head><meta charset="utf-8">'
+    return ('<!doctype html><html lang="%s"><head><meta charset=' '"utf-8">'   # split: the hosting upload drops a second identical charset tag
             '<meta name="viewport" content="width=device-width,initial-scale=1">'
             '<meta name="robots" content="noindex"><title>%s</title><style>%s</style></head><body>'
             '<header><div class="w"><div class="m" style="color:#bbb">BoostWorkers · Praetorian</div><h1>%s</h1></div></header>'
