@@ -341,6 +341,9 @@ def _poshta_html(lang, base, value="", message=""):
                e(WAIT_SEND[lang]), e(t["send"]), e(message), e(t["privacy"])))
 
 
+NOT_FOUND = {"bg": "Тази страница не съществува.", "en": "This page does not exist."}
+
+
 def _message_page(lang, base, title, text):
     e = html.escape
     return ('<!doctype html><html lang="%s"><head>'   # no charset tag here: the hosting upload strips it; the Content-Type header carries charset=utf-8
@@ -588,7 +591,9 @@ def app(environ, start_response):
         return send("200 OK", report.page(res, lang, _cards, back_url=base + "/?lang=" + lang,
                                               extra_html=share_html(lang, button=False)))
 
-    if method == "GET" and path in ("", "/"):
+    if path not in ("", "/") and not (base and path.rstrip("/") == base):   # an address that does not exist is not the form page
+        return send("404 Not Found", _message_page(lang, base, "Praetorian", NOT_FOUND[lang]))
+    if method == "GET":
         broyach.zapishi(DATA_DIR, "posetenia", ref=environ.get("HTTP_REFERER", ""))
     return send("200 OK", _form_page(lang, base=base), index=(method == "GET"))
 

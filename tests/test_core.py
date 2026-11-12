@@ -302,6 +302,15 @@ class Feedback(unittest.TestCase):
         self.assertIn("the method", page)
         self.assertIn("Advice, questions and comments", page)
 
+    def test_unknown_address_is_404(self):
+        out = {}
+        env = {"REQUEST_METHOD": "GET", "PATH_INFO": "/no-such-page", "QUERY_STRING": "lang=en",
+               "SCRIPT_NAME": "/proveri", "REMOTE_ADDR": "1"}
+        page = b"".join(self.web.app(env, lambda s, h: out.update(s=s, h=dict(h)))).decode()
+        self.assertTrue(out["s"].startswith("404"))
+        self.assertEqual(out["h"].get("X-Robots-Tag"), "noindex")
+        self.assertIn("This page does not exist.", page)
+
 
 class Priorities(unittest.TestCase):
     def test_list(self):
