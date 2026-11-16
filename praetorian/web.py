@@ -300,9 +300,14 @@ def _form_page(lang, message="", value="", fb_message="", fb_ok=False, base="", 
 POSHTA = {
     "bg": {"title": "Или: получете отчета на имейл", "intro": "Не искате да чакате? Ще ви изпратим отчета до няколко минути.",
            "address": "Адрес на сайта", "email": "Вашият имейл", "send": "Изпратете ми отчета",
-           "consent": "Съгласен/съгласна съм имейлът ми да се ползва за изпращане на този отчет.",
-           "privacy": "Първо ще получите писмо с връзка за потвърждение — без нея нищо не се изпраща. Пазим имейла само за отчета, "
-                      "до 3 месеца — после се заличава автоматично. Не го даваме на никого. По-ранно изтриване: office@kagami.bg.",
+           # 16.11.2026: текстът до формата по шаблона на адв. Ангелова (15.11.2026), попълнен
+           "consent": "Съгласявам се КАГАМИ ЕООД да използва имейл адреса ми, за да потвърди заявката и да ми изпрати еднократен отчет за посочения сайт.",
+           "privacy": "Отчетът по имейл е по избор — резултатът на екрана горе е достъпен и без имейл. Обработваме имейл адреса и адреса на сайта "
+                      "за изпълнение на заявката въз основа на Вашето съгласие по чл. 6, § 1, б. „а“ от Регламент (ЕС) 2016/679. "
+                      "Заличаваме имейл адреса до 7 дни от изпращането на отчета. При непотвърдена заявка заличаваме имейл адреса до 2 дни от подаването ѝ. "
+                      "Можете да оттеглите съгласието си по всяко време на office@kagami.bg. Оттеглянето действа занапред. "
+                      "Имате право да поискате достъп, коригиране, изтриване, ограничаване и преносимост при приложимите условия, "
+                      "както и да подадете жалба до Комисията за защита на личните данни. Администратор е КАГАМИ ЕООД, ЕИК 103141758, Варна.",
            "sent": "Изпратихме писмо за потвърждение на %s. Отворете връзката в него — отчетът идва след това.",
            "bad_email": "Моля, напишете валиден имейл.", "need_consent": "Отметнете съгласието, за да ви изпратим отчета.",
            "email_limit": "За този имейл днес вече има няколко заявки. Опитайте утре.",
@@ -313,9 +318,13 @@ POSHTA = {
            "bad_link": "Връзката е невалидна или е изтекла (важи 24 часа). Поръчайте отчета отново."},
     "en": {"title": "Or: get the report by email", "intro": "Don't want to wait? We will email you the report within a few minutes.",
            "address": "Website address", "email": "Your email", "send": "Email me the report",
-           "consent": "I agree that my email is used to send this report.",
-           "privacy": "First you get an email with a confirmation link — nothing is sent without it. We keep the email only for the report, "
-                      "for up to 3 months — then it is erased automatically. We share it with nobody. To delete earlier: office@kagami.bg.",
+           "consent": "I agree that KAGAMI Ltd uses my email address to confirm the request and to send me a one-time report for the site above.",
+           "privacy": "The email report is optional — the result on the screen above is available without an email. We process the email address and the site address "
+                      "to fulfil the request on the basis of your consent under Art. 6(1)(a) of Regulation (EU) 2016/679. "
+                      "We erase the email address within 7 days after the report is sent. If the request is not confirmed, we erase the email address within 2 days. "
+                      "You can withdraw your consent at any time at office@kagami.bg; withdrawal has effect for the future. "
+                      "You have the right to request access, rectification, erasure, restriction and portability where applicable, "
+                      "and to lodge a complaint with the Bulgarian Commission for Personal Data Protection. The controller is KAGAMI Ltd (EIK 103141758), Varna, Bulgaria.",
            "sent": "We sent a confirmation email to %s. Open the link in it — the report follows.",
            "bad_email": "Please enter a valid email.", "need_consent": "Please tick the consent box so we can send the report.",
            "email_limit": "This email already made several requests today. Please try tomorrow.",
@@ -336,9 +345,23 @@ def _poshta_html(lang, base, value="", message=""):
             '<label>%s<input name="email" type="email" required maxlength="200" autocomplete="email"></label>'
             '<label class="cb"><input type="checkbox" name="consent" value="1" required> %s</label>'
             '<div class="hp" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>'
-            '<button data-wait="%s">%s</button></form><p class="err">%s</p><p class="m">%s</p></section>'
+            '<button data-wait="%s">%s</button></form><p class="err">%s</p><p class="m">%s <a href="%s/poveritelnost?lang=%s">%s</a></p></section>'
             % (e(t["title"]), e(t["intro"]), e(base), lang, e(t["address"]), e(value), e(t["email"]), e(t["consent"]),
-               e(WAIT_SEND[lang]), e(t["send"]), e(message), e(t["privacy"])))
+               e(WAIT_SEND[lang]), e(t["send"]), e(message), e(t["privacy"]), e(base), lang, e(page_text.POVERITELNOST[lang]["vrazka"])))
+
+
+def _poveritelnost_page(lang, base):
+    """Art. 13 GDPR notice for the whole tool (16.11.2026, after adv. Angelova's opinion of 15.11.2026)."""
+    e = html.escape
+    t = page_text.POVERITELNOST[lang]
+    body = "".join("<h2>%s</h2>%s" % (e(h), "".join("<p>%s</p>" % e(p) for p in ps)) for h, ps in t["razdeli"])
+    return ('<!doctype html><html lang="%s"><head>'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>%s</title><style>%s</style></head><body>'
+            '<header><div class="w"><div class="m" style="color:#bbb">BoostWorkers · Praetorian</div><h1>%s</h1></div></header>'
+            '<main class="w">%s<p class="m">%s</p><p><a href="%s/?lang=%s">%s</a></p></main></body></html>'
+            % (lang, e(t["zaglavie"]), report.CSS, e(t["zaglavie"]), body, e(t["versia"]), e(base), lang,
+               e("← Към проверката" if lang == "bg" else "← Back to the check")))
 
 
 NOT_FOUND = {"bg": "Тази страница не съществува.", "en": "This page does not exist."}
@@ -379,7 +402,7 @@ def zalichi_otzivi(data_dir=None, dni=None, sega=None):
     """Retention for feedback: after 3 months the name and email are erased; the text stays.
     Runs at most once a day. Returns how many records were changed."""
     data_dir = data_dir or DATA_DIR
-    dni = dni or poshta.PAZIM_DNI
+    dni = dni or poshta.OTZIVI_DNI
     sega = sega or time.time()
     p = os.path.join(data_dir, "otzivi.jsonl")
     belezhka = os.path.join(data_dir, ".zalichavane_otzivi")
@@ -474,6 +497,7 @@ def app(environ, start_response):
             return send("403 Forbidden", json.dumps({"error": "key"}), "application/json")
         if path.rstrip("/").endswith("/opashka"):
             zalichi_otzivi()
+            broyach.zalichi_domeyni(DATA_DIR, poshta.DOMEYN_DNI)
             return send("200 OK", json.dumps(poshta.za_rabotnika(DATA_DIR), ensure_ascii=False), "application/json; charset=utf-8")
         try:
             size = min(int(environ.get("CONTENT_LENGTH") or 0), 2_000_000)
@@ -513,6 +537,9 @@ def app(environ, start_response):
     if path.rstrip("/").endswith("/s-native"):              # the phone share sheet (counted by a beacon)
         broyach.zapishi(DATA_DIR, "spodelyane", kanal="telefon")
         return send("204 No Content", "")
+
+    if path.rstrip("/").endswith("/poveritelnost"):
+        return send("200 OK", _poveritelnost_page(lang, base), index=True)
 
     if path.rstrip("/").endswith("/potvardi"):
         z = poshta.potvardi(DATA_DIR, qs.get("id", [""])[0], qs.get("t", [""])[0])

@@ -7,7 +7,9 @@ File: $PRAETORIAN_DATA/broyach/<YYYY-MM-DD>.json
 import datetime as dt
 import json
 import os
+import re
 import threading
+import time
 import urllib.parse
 
 try:
@@ -83,6 +85,51 @@ def sait(data_dir, res, via):
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
         pass
+
+
+def zalichi_domeyni(data_dir, dni=30, sega=None):
+    """16.11.2026 (adv. Angelova 15.11.2026): the checked-site log keeps the domain at most `dni` days.
+    Older day files are rewritten without the domain: time, overall result, software and channel stay
+    as aggregate statistics. Runs at most once a day. Returns how many day files were changed."""
+    sega = sega or time.time()
+    p = os.path.join(data_dir, "proverki")
+    belezhka = os.path.join(p, ".zalichavane")
+    try:
+        if sega - os.path.getmtime(belezhka) < 86400:
+            return 0
+    except OSError:
+        pass
+    n = 0
+    granica = (dt.datetime.fromtimestamp(sega) - dt.timedelta(days=dni)).date().isoformat()
+    try:
+        imena = sorted(os.listdir(p))
+    except OSError:
+        return 0
+    with _lock:
+        for ime in imena:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}\.jsonl", ime) or ime[:10] >= granica:
+                continue
+            pat = os.path.join(p, ime)
+            try:
+                with open(pat, encoding="utf-8") as f:
+                    redove = [json.loads(l) for l in f if l.strip()]
+            except (OSError, ValueError):
+                continue
+            if not any(r.get("sait") for r in redove):
+                continue
+            for r in redove:
+                r.pop("sait", None)
+            tmp = pat + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in redove))
+            os.replace(tmp, pat)
+            n += 1
+        try:
+            with open(belezhka, "w", encoding="utf-8") as f:
+                f.write(time.strftime("%Y-%m-%dT%H:%M:%S"))
+        except OSError:
+            pass
+    return n
 
 
 def saitove(data_dir, den=None):

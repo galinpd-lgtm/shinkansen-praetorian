@@ -141,7 +141,8 @@ class Popravki2026_11_10(unittest.TestCase):
             for lang in ("bg", "en"):
                 self.assertNotIn("безплатна", poshta.TXT[lang]["otchet_kraj"])
                 self.assertNotIn("free", poshta.TXT[lang]["otchet_kraj"])
-                self.assertIn("boostworkers.com/uslugi/", poshta.TXT[lang]["otchet_kraj"])
+                self.assertNotIn("uslugi", poshta.TXT[lang]["otchet_kraj"])   # 16.11.2026: без връзка към платените услуги
+                self.assertIn("https://boostworkers.com", poshta.TXT[lang]["otchet_kraj"])
             oldcap = poshta.PER_DAY_ALL
             poshta.PER_DAY_ALL = 3
             try:
@@ -194,14 +195,33 @@ class Popravki2026_11_10(unittest.TestCase):
         finally:
             poshta.izprati = old
         zid = [f[:-5] for f in os.listdir(poshta.papka(d)) if f.endswith(".json")][0]
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 80 * 86400), 0)
+        # 16.11.2026 (adv. Angelova 15.11.2026): unconfirmed → email gone after 2 days; address after 30 days
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 1 * 86400), 0)
         os.remove(os.path.join(poshta.papka(d), ".zalichavane"))
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 91 * 86400), 1)
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 3 * 86400), 1)
         z = poshta.cheti(d, zid)
         self.assertNotIn("email", z); self.assertNotIn("email_hash", z); self.assertNotIn("token", z)
-        self.assertEqual(z["address"], "example.com")             # the statistics stay
+        self.assertEqual(z["address"], "example.com")             # the address stays up to 30 days
+        self.assertIn("versia", z["saglasie"])                    # proof of consent stays, without the email
         self.assertIsNone(poshta.potvardi(d, zid, ""))             # an erased request cannot be confirmed
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 92 * 86400), 0)   # once a day at most
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 3.5 * 86400), 0)   # once a day at most
+        os.remove(os.path.join(poshta.papka(d), ".zalichavane"))
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 31 * 86400), 1)
+        self.assertNotIn("address", poshta.cheti(d, zid))
+        # a sent report: email kept up to 7 days after sending
+        d2 = tempfile.mkdtemp()
+        poshta.izprati = lambda *a, **k: None
+        try:
+            poshta.nova(d2, "example.org", "c@d.bg", "bg")
+            z2 = poshta.cheti(d2, [f[:-5] for f in os.listdir(poshta.papka(d2)) if f.endswith(".json")][0])
+            z2["status"] = "v_rabota"; poshta.zapishi(d2, z2)
+            poshta.rezultat(d2, z2["id"], None, None, None, greshka="x")
+        finally:
+            poshta.izprati = old
+        self.assertEqual(poshta.zalichi_stari(d2, sega=time.time() + 6 * 86400), 0)
+        os.remove(os.path.join(poshta.papka(d2), ".zalichavane"))
+        self.assertEqual(poshta.zalichi_stari(d2, sega=time.time() + 8 * 86400), 1)
+        self.assertNotIn("email", poshta.cheti(d2, z2["id"]))
         with open(os.path.join(d, "otzivi.jsonl"), "w", encoding="utf-8") as f:
             f.write(json.dumps({"time": "2026-07-01T10:00:00", "lang": "bg", "message": "стар", "name": "Иван", "email": "i@x.bg", "consent": True}, ensure_ascii=False) + "\n")
             f.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "lang": "bg", "message": "нов", "name": "Мария", "email": "m@x.bg", "consent": True}, ensure_ascii=False) + "\n")
@@ -237,8 +257,39 @@ class Popravki2026_11_10(unittest.TestCase):
         self.assertNotIn("_sega", poshta.cheti(d, zid))
 
 
-if __name__ == "__main__":
-    unittest.main()
+class Poveritelnost2026_11_16(unittest.TestCase):
+    """16.11.2026 — adv. Angelova's opinion of 15.11.2026: domains in the site log at most 30 days; privacy page."""
+
+    def test_domeyni_30_dni(self):
+        import tempfile, os, json, time, datetime as dt
+        from praetorian import broyach
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, "proverki"); os.makedirs(p)
+        star = (dt.date.today() - dt.timedelta(days=40)).isoformat()
+        nov = dt.date.today().isoformat()
+        for den in (star, nov):
+            with open(os.path.join(p, den + ".jsonl"), "w", encoding="utf-8") as f:
+                f.write(json.dumps({"t": den + " 10:00", "sait": "ivan.bg", "rezultat": "patched", "softuer": [], "via": "ekran"}) + "\n")
+        self.assertEqual(broyach.zalichi_domeyni(d, 30), 1)
+        self.assertNotIn("sait", broyach.saitove(d, star)[0])
+        self.assertEqual(broyach.saitove(d, star)[0]["rezultat"], "patched")
+        self.assertEqual(broyach.saitove(d, nov)[0]["sait"], "ivan.bg")
+        self.assertEqual(broyach.zalichi_domeyni(d, 30), 0)          # once a day at most
+
+    def test_stranica_i_tekst(self):
+        from praetorian import web, poshta
+        self.assertIn("КАГАМИ ЕООД", web.POSHTA["bg"]["consent"])
+        self.assertIn("7 дни", web.POSHTA["bg"]["privacy"]); self.assertIn("2 дни", web.POSHTA["bg"]["privacy"])
+        self.assertEqual(poshta.SAGLASIE_VERSIA, "2026-11-16")
+        for lang in ("bg", "en"):
+            out = []
+            body = b"".join(web.app({"REQUEST_METHOD": "GET", "PATH_INFO": "/poveritelnost", "QUERY_STRING": "lang=" + lang},
+                                    lambda s, h: out.append(s))).decode("utf-8")
+            self.assertTrue(out[0].startswith("200"))
+            self.assertIn("office@kagami.bg", body); self.assertIn("30", body)
+        self.assertIn("/poveritelnost", web._poshta_html("bg", ""))
+
+
 
 
 class Packages(unittest.TestCase):
@@ -383,3 +434,7 @@ class Broyach(unittest.TestCase):
         self.assertEqual(s["posetenia"], 2)
         self.assertEqual(s["ot"], {"facebook.com": 1, "linkedin.com": 1})
         self.assertEqual(s["kanali"], {"viber": 1})
+
+
+if __name__ == "__main__":
+    unittest.main()

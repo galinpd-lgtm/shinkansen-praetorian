@@ -26,8 +26,12 @@ BAZA = os.environ.get("PRAETORIAN_BASE_URL", "https://boostworkers.com/proveri")
 EMAIL_RE = re.compile(r"^[^@\s<>\"',;]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$")
 PER_EMAIL_DAY = 3
 PER_DAY_ALL = 50              # all confirmation emails in 24 hours, from everybody together
-PAZIM_DNI = 90                # emails are kept 3 months, then erased (decision of 10.11.2026)
-SAGLASIE_VERSIA = "2026-11-10"   # version of the consent/privacy text shown on the page
+# 16.11.2026 — по становището на адв. Ангелова от 15.11.2026 (целта е еднократна доставка → кратки срокове)
+PAZIM_DNI = 7                 # the email is erased up to 7 days after the report is sent
+NEPOTVARDENI_DNI = 2          # an unconfirmed request loses the email after 2 days
+DOMEYN_DNI = 30               # the site address stays at most 30 days; then only status/time/language remain
+OTZIVI_DNI = 90               # feedback: name and email erased after 3 months (decision of 10.11.2026), the text stays
+SAGLASIE_VERSIA = "2026-11-16"   # version of the consent/privacy text shown on the page
 POTVARDI_ZA = 24 * 3600
 _lock = threading.Lock()
 
@@ -39,8 +43,8 @@ TXT = {
                       "BoostWorkers Praetorian · https://boostworkers.com/proveri/\nKAGAMI ЕООД, Варна · office@kagami.bg",
         "otchet_tema": "Отчет: %s — проверка за пробиви",
         "otchet_uvod": "Здравейте,\n\nЕто отчета за %s. Пълният отчет е в HTML частта на писмото.\n\n",
-        "otchet_kraj": "\n\nИскате ли да го оправим ние? Вижте как: https://boostworkers.com/uslugi/\n"
-                       "Проверете и друг сайт: https://boostworkers.com/proveri/\n\nBoostWorkers Praetorian · KAGAMI ЕООД, Варна · office@kagami.bg",
+        # 16.11.2026 (адв. Ангелова, 15.11; Галин: „Да, спри ги“): без връзка към платените услуги — само неутрален подпис
+        "otchet_kraj": "\n\nBoostWorkers Praetorian · KAGAMI ЕООД, Варна · https://boostworkers.com · office@kagami.bg",
     },
     "en": {
         "potv_tema": "Please confirm: report for %s",
@@ -49,8 +53,7 @@ TXT = {
                       "BoostWorkers Praetorian · https://boostworkers.com/proveri/?lang=en\nKAGAMI Ltd, Varna, Bulgaria · office@kagami.bg",
         "otchet_tema": "Report: %s — breach check",
         "otchet_uvod": "Hello,\n\nHere is the report for %s. The full report is in the HTML part of this email.\n\n",
-        "otchet_kraj": "\n\nWant us to fix it? See how: https://en.boostworkers.com/uslugi/\n"
-                       "Check another site: https://boostworkers.com/proveri/?lang=en\n\nBoostWorkers Praetorian · KAGAMI Ltd, Varna · office@kagami.bg",
+        "otchet_kraj": "\n\nBoostWorkers Praetorian · KAGAMI Ltd, Varna, Bulgaria · https://boostworkers.com · office@kagami.bg",
     },
 }
 
@@ -136,9 +139,13 @@ def nova(data_dir, address, email, lang, novini=False, saglasie_tekst=""):
     return True, ""
 
 
-def zalichi_stari(data_dir, dni=PAZIM_DNI, sega=None):
-    """Retention: requests older than `dni` days lose the email, its hash and the token; the rest
-    (site, time, status) stays for statistics. Runs at most once a day. Returns how many were erased."""
+def zalichi_stari(data_dir, dni=PAZIM_DNI, sega=None, nepotvardeni=NEPOTVARDENI_DNI, domeyn=DOMEYN_DNI):
+    """Retention (16.11.2026, adv. Angelova 15.11.2026):
+    - unconfirmed request: email, hash and token erased `nepotvardeni` days after it was made;
+    - any other request: erased `dni` days after the report was sent (or after it was made, if never sent);
+    - the site address is dropped `domeyn` days after the request; status, time, language stay for statistics.
+    The consent record (time + text version) stays, but without the email it can no longer be linked to anybody.
+    Runs at most once a day. Returns how many requests were changed."""
     sega = sega or time.time()
     belezhka = os.path.join(papka(data_dir), ".zalichavane")
     try:
@@ -155,13 +162,27 @@ def zalichi_stari(data_dir, dni=PAZIM_DNI, sega=None):
                 z = cheti(data_dir, name[:-5])
             except (OSError, ValueError):
                 continue
-            if z.get("email") and sega - z.get("sazdadena", sega) > dni * 86400:
-                for k in ("email", "email_hash", "token"):
-                    z.pop(k, None)
-                if z.get("status") in ("chaka_potvarzhdenie", "potvardena", "v_rabota"):
-                    z["status"] = "iztekla"
-                z["zalicheno"] = sega
-                z.setdefault("istoria", []).append(["zalicheno", sega])
+            sazdadena = z.get("sazdadena", sega)
+            izpratena = max([t for s_, t in z.get("istoria", []) if s_ == "izpratena"] or [sazdadena])
+            promeneno = False
+            if z.get("email"):
+                if z.get("status") == "chaka_potvarzhdenie":
+                    iztekla = sega - sazdadena > nepotvardeni * 86400
+                else:
+                    iztekla = sega - izpratena > dni * 86400
+                if iztekla:
+                    for k in ("email", "email_hash", "token"):
+                        z.pop(k, None)
+                    if z.get("status") in ("chaka_potvarzhdenie", "potvardena", "v_rabota"):
+                        z["status"] = "iztekla"
+                    z["zalicheno"] = sega
+                    z.setdefault("istoria", []).append(["zalicheno", sega])
+                    promeneno = True
+            if z.get("address") and sega - sazdadena > domeyn * 86400:
+                z.pop("address", None)
+                z["domeyn_zalichen"] = sega
+                promeneno = True
+            if promeneno:
                 zapishi(data_dir, z)
                 n += 1
         with open(belezhka, "w", encoding="utf-8") as f:

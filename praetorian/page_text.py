@@ -99,3 +99,103 @@ FEEDBACK = {
         "error": "The message could not be saved. Write to office@kagami.bg.",
     },
 }
+
+
+# 16.11.2026 — уведомление по чл. 13 GDPR за целия инструмент (след становището на адв. Ангелова от 15.11.2026).
+# Всяка промяна тук = нова версия (poshta.SAGLASIE_VERSIA и „versia“ по-долу).
+POVERITELNOST = {
+    "bg": {
+        "vrazka": "Поверителност — всичко за данните",
+        "zaglavie": "Поверителност · Praetorian",
+        "versia": "Версия от 16.11.2026.",
+        "razdeli": [
+            ("Кой е администратор", [
+                "КАГАМИ ЕООД, ЕИК 103141758, Варна. Контакт по всички въпроси за данните: office@kagami.bg.",
+            ]),
+            ("Проверката на екрана", [
+                "Въвеждате адрес на сайт и виждате резултата на екрана. Не искаме име, имейл или регистрация.",
+                "IP адресът Ви се ползва само в паметта на сървъра, за да ограничим броя проверки на час, и не се записва от нас.",
+                "За вътрешна статистика записваме проверения сайт, часа, общия резултат и разпознатия софтуер — без IP адрес и без данни кой е питал. "
+                "Основание: законният ни интерес да следим натоварването и качеството на проверките (чл. 6, § 1, б. „е“ GDPR). "
+                "Адресът на сайта се заличава до 30 дни от проверката; после остават само обобщени показатели без адреса.",
+            ]),
+            ("Отчетът по имейл (по избор)", [
+                "Ако поискате отчета на имейл, обработваме имейл адреса и адреса на сайта, за да потвърдим заявката и да Ви изпратим еднократен отчет. "
+                "Основание: Вашето съгласие (чл. 6, § 1, б. „а“ GDPR), дадено с отметка и потвърдено с връзка в писмо. Без потвърждение отчет не се изпраща.",
+                "Заличаваме имейл адреса до 7 дни от изпращането на отчета, а при непотвърдена заявка — до 2 дни от подаването ѝ. "
+                "Адресът на сайта в заявката се заличава до 30 дни.",
+                "Какво остава след това: часът и състоянието на заявката, езикът и запис кога и за коя версия на този текст е дадено съгласието — "
+                "без имейл и без нищо, по което да се свърже с Вас. Пазим го, за да можем да покажем, че отчетите се изпращат само след съгласие.",
+                "Можете да оттеглите съгласието си по всяко време на office@kagami.bg. Оттеглянето действа занапред.",
+            ]),
+            ("Съвети, въпроси и коментари", [
+                "Пазим текста на съобщението. Име и имейл — само ако ги напишете; имейлът е за отговор и само със съгласие. "
+                "Името и имейлът се заличават автоматично след 3 месеца.",
+                "Текстът остава след това само ако не позволява да се разпознае авторът или друг човек. Преглеждаме го и при нужда махаме имена, "
+                "контакти и разпознаваеми подробности. Съобщенията не се публикуват.",
+            ]),
+            ("Броячът", [
+                "Броим посещенията и натисканията на „Сподели“ на сървъра, по половин час, заедно с домейна на страницата, от която идвате. "
+                "Без бисквитки, без IP адрес, без нищо в устройството Ви.",
+            ]),
+            ("Кой получава данните", [
+                "Хостингът на сайта и пощенският сървър, през който се изпращат писмата: SuperHosting.BG (България, ЕС).",
+                "Отчетите по имейл се изготвят на собствен сървър на КАГАМИ ЕООД във Варна; той получава само адреса на сайта.",
+                "Не предаваме данни извън Европейското икономическо пространство, не ги продаваме и не ги ползваме за реклама.",
+                "Хостингът води собствени технически дневници на заявките към сървъра по своите правила.",
+            ]),
+            ("Вашите права", [
+                "Имате право да поискате достъп, коригиране, изтриване, ограничаване и преносимост на данните си, както и да възразите срещу "
+                "обработването на основание законен интерес — при приложимите условия. Пишете на office@kagami.bg.",
+                "Имате право на жалба до Комисията за защита на личните данни (www.cpdp.bg).",
+            ]),
+        ],
+    },
+    "en": {
+        "vrazka": "Privacy — all about the data",
+        "zaglavie": "Privacy · Praetorian",
+        "versia": "Version of 16 November 2026.",
+        "razdeli": [
+            ("Who is the controller", [
+                "KAGAMI Ltd (EIK 103141758), Varna, Bulgaria. Contact for any question about data: office@kagami.bg.",
+            ]),
+            ("The check on the screen", [
+                "You enter a website address and see the result on the screen. We ask for no name, email or registration.",
+                "Your IP address is used only in the server's memory to limit checks per hour and is not stored by us.",
+                "For internal statistics we record the checked site, the time, the overall result and the detected software — no IP address and nothing about who asked. "
+                "Legal basis: our legitimate interest in monitoring load and quality (Art. 6(1)(f) GDPR). "
+                "The site address is erased within 30 days of the check; only aggregate figures without the address remain.",
+            ]),
+            ("The email report (optional)", [
+                "If you ask for the report by email, we process the email address and the site address to confirm the request and send you a one-time report. "
+                "Legal basis: your consent (Art. 6(1)(a) GDPR), given with a tick box and confirmed through a link by email. Without confirmation no report is sent.",
+                "We erase the email address within 7 days after the report is sent, or within 2 days if the request is not confirmed. "
+                "The site address in the request is erased within 30 days.",
+                "What remains: the time and state of the request, the language and a record of when and for which version of this text consent was given — "
+                "with no email and nothing that links it to you. We keep it to show that reports are sent only after consent.",
+                "You can withdraw your consent at any time at office@kagami.bg; withdrawal has effect for the future.",
+            ]),
+            ("Advice, questions and comments", [
+                "We keep the text of the message. Name and email only if you write them; the email is for an answer and only with consent. "
+                "Name and email are erased automatically after 3 months.",
+                "The text stays afterwards only if it does not allow the author or another person to be identified. We review it and remove names, "
+                "contacts and identifying details where needed. Messages are not published.",
+            ]),
+            ("The counter", [
+                "We count visits and clicks on “Share” on the server, per half hour, together with the domain of the page you came from. "
+                "No cookies, no IP address, nothing on your device.",
+            ]),
+            ("Who receives the data", [
+                "The website host and the mail server that sends the emails: SuperHosting.BG (Bulgaria, EU).",
+                "Email reports are produced on KAGAMI Ltd's own server in Varna; it receives only the site address.",
+                "We transfer no data outside the European Economic Area, do not sell it and do not use it for advertising.",
+                "The host keeps its own technical logs of requests to the server under its own rules.",
+            ]),
+            ("Your rights", [
+                "You have the right to request access, rectification, erasure, restriction and portability, and to object to processing based on "
+                "legitimate interest — where applicable. Write to office@kagami.bg.",
+                "You have the right to lodge a complaint with the Bulgarian Commission for Personal Data Protection (www.cpdp.bg).",
+            ]),
+        ],
+    },
+}
