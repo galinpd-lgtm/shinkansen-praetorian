@@ -196,17 +196,17 @@ class Popravki2026_11_10(unittest.TestCase):
             poshta.izprati = old
         zid = [f[:-5] for f in os.listdir(poshta.papka(d)) if f.endswith(".json")][0]
         # 16.11.2026 (adv. Angelova 15.11.2026): unconfirmed → email gone after 2 days; address after 30 days
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 1 * 86400), 0)
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 0.5 * 86400), 0)
         os.remove(os.path.join(poshta.papka(d), ".zalichavane"))
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 3 * 86400), 1)
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 1.5 * 86400), 1)   # „до 2 дни“ holds with a daily run
         z = poshta.cheti(d, zid)
         self.assertNotIn("email", z); self.assertNotIn("email_hash", z); self.assertNotIn("token", z)
         self.assertEqual(z["address"], "example.com")             # the address stays up to 30 days
         self.assertIn("versia", z["saglasie"])                    # proof of consent stays, without the email
         self.assertIsNone(poshta.potvardi(d, zid, ""))             # an erased request cannot be confirmed
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 3.5 * 86400), 0)   # once a day at most
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 1.8 * 86400), 0)   # once a day at most
         os.remove(os.path.join(poshta.papka(d), ".zalichavane"))
-        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 31 * 86400), 1)
+        self.assertEqual(poshta.zalichi_stari(d, sega=time.time() + 29.5 * 86400), 1)
         self.assertNotIn("address", poshta.cheti(d, zid))
         # a sent report: email kept up to 7 days after sending
         d2 = tempfile.mkdtemp()
@@ -218,9 +218,9 @@ class Popravki2026_11_10(unittest.TestCase):
             poshta.rezultat(d2, z2["id"], None, None, None, greshka="x")
         finally:
             poshta.izprati = old
-        self.assertEqual(poshta.zalichi_stari(d2, sega=time.time() + 6 * 86400), 0)
+        self.assertEqual(poshta.zalichi_stari(d2, sega=time.time() + 5 * 86400), 0)
         os.remove(os.path.join(poshta.papka(d2), ".zalichavane"))
-        self.assertEqual(poshta.zalichi_stari(d2, sega=time.time() + 8 * 86400), 1)
+        self.assertEqual(poshta.zalichi_stari(d2, sega=time.time() + 6.5 * 86400), 1)
         self.assertNotIn("email", poshta.cheti(d2, z2["id"]))
         with open(os.path.join(d, "otzivi.jsonl"), "w", encoding="utf-8") as f:
             f.write(json.dumps({"time": "2026-07-01T10:00:00", "lang": "bg", "message": "стар", "name": "Иван", "email": "i@x.bg", "consent": True}, ensure_ascii=False) + "\n")

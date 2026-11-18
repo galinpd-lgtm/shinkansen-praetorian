@@ -100,7 +100,8 @@ def zalichi_domeyni(data_dir, dni=30, sega=None):
     except OSError:
         pass
     n = 0
-    granica = (dt.datetime.fromtimestamp(sega) - dt.timedelta(days=dni)).date().isoformat()
+    # a day file D is cleaned on the first daily run with today >= D + dni - 1 → no domain stays more than `dni` days
+    granica = (dt.datetime.fromtimestamp(sega) - dt.timedelta(days=dni - 2)).date().isoformat()
     try:
         imena = sorted(os.listdir(p))
     except OSError:

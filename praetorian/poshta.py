@@ -31,6 +31,8 @@ PAZIM_DNI = 7                 # the email is erased up to 7 days after the repor
 NEPOTVARDENI_DNI = 2          # an unconfirmed request loses the email after 2 days
 DOMEYN_DNI = 30               # the site address stays at most 30 days; then only status/time/language remain
 OTZIVI_DNI = 90               # feedback: name and email erased after 3 months (decision of 10.11.2026), the text stays
+# the check runs at most once a day → erase one day early, so the published „до N дни“ always holds
+ZAPAS = 86400
 SAGLASIE_VERSIA = "2026-11-16"   # version of the consent/privacy text shown on the page
 POTVARDI_ZA = 24 * 3600
 _lock = threading.Lock()
@@ -167,9 +169,9 @@ def zalichi_stari(data_dir, dni=PAZIM_DNI, sega=None, nepotvardeni=NEPOTVARDENI_
             promeneno = False
             if z.get("email"):
                 if z.get("status") == "chaka_potvarzhdenie":
-                    iztekla = sega - sazdadena > nepotvardeni * 86400
+                    iztekla = sega - sazdadena > nepotvardeni * 86400 - ZAPAS
                 else:
-                    iztekla = sega - izpratena > dni * 86400
+                    iztekla = sega - izpratena > dni * 86400 - ZAPAS
                 if iztekla:
                     for k in ("email", "email_hash", "token"):
                         z.pop(k, None)
@@ -178,7 +180,7 @@ def zalichi_stari(data_dir, dni=PAZIM_DNI, sega=None, nepotvardeni=NEPOTVARDENI_
                     z["zalicheno"] = sega
                     z.setdefault("istoria", []).append(["zalicheno", sega])
                     promeneno = True
-            if z.get("address") and sega - sazdadena > domeyn * 86400:
+            if z.get("address") and sega - sazdadena > domeyn * 86400 - ZAPAS:
                 z.pop("address", None)
                 z["domeyn_zalichen"] = sega
                 promeneno = True
